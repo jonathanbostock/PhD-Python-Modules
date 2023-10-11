@@ -47,8 +47,8 @@ lin_list_2 = [(0,"#000000"),(0.34,"#602a00"),(0.65,"#00ba87"),(1,"#ffc1e4")]
 cyclic_list = [(0,"#100a10"),(0.25,"#1c719f"),(0.5,"#cbc584"),
                (0.7,"#b34f00"),(1,"#100a10")]
     # AFM colormap
-afm_list = [(0, "#000000"), (0.23,"#3C1CA2"), (0.49, "#3C8FCC"),
-            (0.75, "#BEE3E1"), (1, "#EAECEB")]
+afm_list = [(0, "#000000"), (0.23,"#420E67"), (0.50, "#5252C4"),
+            (0.75, "#7ECCCF"), (1, "#EEEEEE")]
 
 
 
@@ -465,13 +465,16 @@ def plotdf(axis, df,
 def heatmap(axis, matrix, colormap="lin",
             legend=True,val_range = None):
 
+    matrix_list = flatten(matrix)
+
+    if val_range == None:
+        val_min = matrix_list.min()
+        val_max = matrix_list.max()
+    else:
+        val_min = val_range[0]
+        val_max = val_range[1]
+
     if legend == True:
-        if val_range == None:
-            val_min = matrix_as_array.min()
-            val_max = matrix_as_array.max()
-        else:
-            val_min = val_range[0]
-            val_max = val_range[1]
 
         heatmap_norm = mcolors.Normalize(vmin=val_min, vmax=val_max)
         scalar_mappable = cm.ScalarMappable(norm=heatmap_norm,
@@ -479,10 +482,7 @@ def heatmap(axis, matrix, colormap="lin",
 
         axis.figure.colorbar(scalar_mappable, ax=axis)
 
-    if val_range == None:
-        val_range = [None,None]
-
-    axis.imshow(matrix, cmap=colormap, vmin=val_range[0], vmax = val_range[1])
+    axis.imshow(matrix, cmap=colormap_dict[colormap], vmin=val_min, vmax = val_max)
 
 # Bar chart time
 def barchart(axis, values, names=[], sigma_list=[],
@@ -554,6 +554,12 @@ def nice_legend(axis):
     axis.legend(loc="center left", bbox_to_anchor = (1, 0.5),
                 frameon=False)
 
+#Recursively flattens a list of lists into a list
+def flatten(possible_list):
+    if hasattr(possible_list, "__itera__"):
+        return [flatten(i) for i in possible_list]
+    else:
+        return possible_list
 
 # Does a ridgeline plot
 def ridgelinedf(figure,
