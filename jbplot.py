@@ -70,7 +70,8 @@ colormap_dict = {"bilin":bilinear_colormap,
                  "lin":linear_colormap,
                  "lin2":linear_colormap_2,
                  "line_grad":line_grad_colormap,
-                 "cyc":cyclic_colormap}
+                 "cyc":cyclic_colormap,
+                 "afm":afm_colormap}
 
 """
 Code calling order is:
@@ -351,12 +352,12 @@ def plotfunset(axis, function_set,
 #This can be useful when your functions are kinda weird
 def plot2dfun(axis, function,
               second_var,
-              sig_fun = None,
+              sig_function = None,
               gradient=False,
               **kwargs):
 
     color_override = None
-    sig_function = None
+    sig_function_curried = None
 
 
     for i, var in enumerate(second_var):
@@ -368,11 +369,11 @@ def plot2dfun(axis, function,
                                               len(second_var),
                                               color_override)
 
-        if sig_fun != None:
-            sig_function = lambda x: sig_fun(x, var)
+        if sig_function != None:
+            sig_function_curried = lambda x: sig_function(x, var)
 
         plotfun(axis, lambda x: function(x, var),
-                sig_function = sig_function,
+                sig_function = sig_function_curried,
                 colorcode=i,
                 linecode=0,
                 color_override = color_override,
@@ -388,7 +389,7 @@ def plotdf(axis, df,
            gradient=False,
            sort_x=False,
            name=None,
-           name_map=False,
+           name_map=None,
            name_list=None,
            plot_type="scatter",
            gradient_map = lambda x: x,
@@ -402,7 +403,7 @@ def plotdf(axis, df,
     if name == "y":
         name_list = y
     elif name != None:
-        if name_map == False:
+        if name_map == None:
             name_list = df[name].drop_duplicates().tolist()
         else:
             name_list = [name_map(n) for n in df[name].drop_duplicates()]
@@ -460,7 +461,7 @@ def plotdf(axis, df,
                     name_list=name_list,
                     **kwargs)
 
-# An function which plots a heatmap
+# Function which plots a heatmap
 def heatmap(axis, matrix, colormap="lin",
             legend=True,val_range = None):
 
@@ -553,18 +554,6 @@ def nice_legend(axis):
     axis.legend(loc="center left", bbox_to_anchor = (1, 0.5),
                 frameon=False)
 
-#Don't use a violin plot
-def violinplot(*args, **kwargs):
-
-    import webbrowser
-    webbrowser.open_new_tab("youtube.com/watch?v=_0QMKFzW9fw")
-
-    try:
-        ridgelinedf(*args, **kwargs)
-        print("Don't use violin plots, here's a better plot")
-    except:
-        raise Exception("Don't use violin plots")
-
 
 # Does a ridgeline plot
 def ridgelinedf(figure,
@@ -572,7 +561,6 @@ def ridgelinedf(figure,
                 x = ["x"],
                 y = ["y"],
                 gradient = False,
-                row_names = None,
                 colorcodes = None,
                 linecodes = None,
                 x_scale = None,
@@ -656,3 +644,16 @@ def ridgelinedf(figure,
 
     if x_axis_name != None:
         ax_objs[-1].set_xlabel(x_axis_name)
+
+
+#Don't use a violin plot
+def violinplot(*args, **kwargs):
+
+    import webbrowser
+    webbrowser.open_new_tab("youtube.com/watch?v=_0QMKFzW9fw")
+
+    try:
+        ridgelinedf(*args, **kwargs)
+        print("Don't use violin plots, here's a better plot")
+    except:
+        raise Exception("Don't use violin plots")
