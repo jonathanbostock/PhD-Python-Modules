@@ -49,10 +49,15 @@ cyclic_list = [(0,"#100a10"),(0.25,"#1c719f"),(0.5,"#cbc584"),
     # AFM colormap
 afm_list = [(0, "#000000"), (0.23,"#420E67"), (0.50, "#5252C4"),
             (0.75, "#7ECCCF"), (1, "#EEEEEE")]
+    # Black/white colormap
+bw_list = [(0, "#000000"), (1, "#FFFFFF")]
+    # Cmy colormap
+cmy_list = [(0, "#ff708f"), (1/7, "#ffde21"), (2/7, "#b3ff4c"),
+            (3/7, "#46ffb9"), (4/7, "#24dbff"), (5/7, "#926dff"),
+            (6/7, "#ff00ff"), (1, "#ff708f")]
 
 
-
-#Convert colormap lists to colormaps
+# Convert colormap lists to colormaps
 bilinear_colormap = mcolors.LinearSegmentedColormap.from_list("bilin",
                                                               bilin_list)
 linear_colormap = mcolors.LinearSegmentedColormap.from_list("lin",
@@ -64,14 +69,20 @@ cyclic_colormap = mcolors.LinearSegmentedColormap.from_list("cyc",
                                                             cyclic_list)
 afm_colormap = mcolors.LinearSegmentedColormap.from_list("afm",
                                                          afm_list)
+bw_colormap = mcolors.LinearSegmentedColormap.from_list("bw",
+                                                        bw_list)
+cmy_colormap = mcolors.LinearSegmentedColormap.from_list("cmy",
+                                                         cmy_list)
 
-#Make a dictionary of colormaps
+# Make a dictionary of colormaps
 colormap_dict = {"bilin":bilinear_colormap,
                  "lin":linear_colormap,
                  "lin2":linear_colormap_2,
                  "line_grad":line_grad_colormap,
                  "cyc":cyclic_colormap,
-                 "afm":afm_colormap}
+                 "afm":afm_colormap,
+                 "bw":bw_colormap,
+                 "cmy":cmy_colormap}
 
 """
 Code calling order is:
@@ -82,7 +93,7 @@ Code calling order is:
         plot2dfun       --> plotfun
                 ^haha currying go brrrrr
         plotfun         --> plotline
-        plotdf          --> scatterset and/or plotlineset 
+        plotdf          --> scatterset and/or plotlineset
         violinplot      --> ridgelinedf
         rdigelinedf     --> plotline
 
@@ -93,9 +104,10 @@ It all comes back to plotline in the end.
         - jbplot.plotline
 """
 
-#This is our other workhorse (although like any good function in this package
-#it still calls plotline)
-#Might add x_sig_vectors in the future (but these are kinda extra tbh)
+
+# This is our other workhorse (although like any good function in this package
+# it still calls plotline)
+# Might add x_sig_vectors in the future (but these are kinda extra tbh)
 def scatter(axis, x_vect, y_vect, y_sig_vect=None,
             colorcode=0,linecode=-1,marktype = "f",
             markcode=0,annotations=[],
@@ -354,10 +366,12 @@ def plot2dfun(axis, function,
               second_var,
               sig_function = None,
               gradient=False,
+              name_list=None,
               **kwargs):
 
     color_override = None
     sig_function_curried = None
+    name = None
 
 
     for i, var in enumerate(second_var):
@@ -372,11 +386,15 @@ def plot2dfun(axis, function,
         if sig_function != None:
             sig_function_curried = lambda x: sig_function(x, var)
 
+        if name_list != None:
+            name = name_list[i]
+
         plotfun(axis, lambda x: function(x, var),
                 sig_function = sig_function_curried,
                 colorcode=i,
                 linecode=0,
                 color_override = color_override,
+                label=name,
                 **kwargs)
 
 
@@ -462,7 +480,7 @@ def plotdf(axis, df,
                     **kwargs)
 
 # Function which plots a heatmap
-def heatmap(axis, matrix, colormap="lin",
+def heatmap(axis, matrix, colormap="line_grad",
             legend=True,val_range = None):
 
     matrix_list = flatten(matrix)
@@ -483,6 +501,25 @@ def heatmap(axis, matrix, colormap="lin",
         axis.figure.colorbar(scalar_mappable, ax=axis)
 
     axis.imshow(matrix, cmap=colormap_dict[colormap], vmin=val_min, vmax = val_max)
+
+# Complex heatmap coz i'm smart and cool
+# Doesnt work for the colorblind sadly
+# No way I can work out to transform a 2d plane where coordinates are X = blue intensity and Y = yellow intensity
+# into sensible polar coordinates, so the colorblind unfortunatley get griddied on by topology
+# Sorry Lorenzo
+def complex_heatmap(ax, complex_number_array, intensity_transform = lambda x: x):
+
+    two_pi = 2*np.pi
+
+    theta_array = np.divide(np.add(np.angle(complex_number_array), np.pi), two_pi)
+    magnitude_array = intensity_transform(np.abs(complex_number_array))
+    normalized_magnitude_array = np.divide(magnitude_array, np.max(magnitude_array))
+
+    color_array = [[np.array(cmy_colormap(theta)[0:3]) * normalized_magnitude
+                    for normalized_magnitude, theta in zip(normalized_magnitude_list, theta_list)]
+                   for normalized_magnitude_list, theta_list in zip(normalized_magnitude_array, theta_array)]
+
+    ax.imshow(color_array)
 
 # Bar chart time
 def barchart(axis, values, names=[], sigma_list=[],
