@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 import matplotlib.cm as cm
 import matplotlib.gridspec as grid_spec
+import matplotlib.collections as mcollections
 import matplotlib
 import numpy as np
 import pandas as pd
@@ -21,7 +22,8 @@ okabe_ito = ["#e69f00", #Orange
              "#0072B2", #Dark Blue
              "black","white"]
 
-
+# Always do it
+two_pi = 2*np.pi
 
 #The colors variable (in american spelling) can be altered by users of the module if they want
 colors = okabe_ito
@@ -194,6 +196,73 @@ def plotline(axis, x_vect, y_vect, y_sig_vect=None,
               zorder=0,
               linestyle=lines[linecode_to_plot],
               color=color_to_plot,**kwargs)
+
+# A complex version of plotline
+def complex_plotline(axis, x_vect, y_vect, fill=True):
+
+    x_vect_doubled = [x for x in x_vect for i in range(2)]
+    y_vect_doubled = [y for y in y_vect for i in range(2)]
+
+    y_abs_vect = np.abs(y_vect_doubled)
+    y_theta_norm = np.divide(np.add(np.angle(y_vect_doubled), np.pi), two_pi)
+
+    x_coords = np.average([x_vect_doubled[:-1], x_vect_doubled[1:]], axis=0)
+    y_coords = np.average([y_abs_vect[:-1], y_abs_vect[1:]], axis=0)
+
+    points = np.array([x_coords, y_coords]).T.reshape(-1,1,2)
+    segments = np.concatenate([points[:-1],points[1:]], axis=1)
+
+    line_collection = mcollections.LineCollection(segments, cmap=cmy_colormap)
+    line_collection.set_array(y_theta_norm[1:-1])
+    axis.add_collection(line_collection)
+
+
+def complex_scatter(axis, x_vect, y_vect, marktype = "f",
+                    markcode = 0, marksize=10, line=False,
+                    linewidth=1, phasebar = True,
+                    **kwargs):
+
+    y_abs_vect = np.abs(y_vect)
+    y_theta_norm = np.divide(np.add(np.angle(y_vect), np.pi), two_pi)
+    color_vect = [cmy_colormap(y_theta)[0:3] for y_theta in y_theta_norm]
+
+    mark = marks[marktype][markcode]
+
+    if line:
+        plotline(axis, x_vect, y_abs_vect, colorcode=-2, linecode=0, linewidth=linewidth)
+
+    if marktype == "f":
+        axis.scatter(x_vect, y_abs_vect,
+                     color=color_vect,
+                     edgecolors="black",
+                     marker=mark,
+                     s=marksize,
+                     zorder=2,
+                     linewidth=linewidth,
+                     **kwargs)
+    else:
+        axis.scatter(x_vect, y_abs_vect,
+                     color=color_vect,
+                     marker=mark,
+                     s=marksize,
+                     zorder=2,
+                     **kwargs)
+
+    if phasebar:
+
+        heatmap_norm = mcolors.Normalize(vmin=0, vmax=two_pi)
+        scalar_mappable = cm.ScalarMappable(norm=heatmap_norm,
+                                            cmap = cmy_colormap)
+        colorbar = axis.figure.colorbar(scalar_mappable, ax=axis,
+                                        ticks=[0, np.pi, two_pi])
+        colorbar.ax.set_yticklabels(["0", "$\pi$", "$2\pi$"])
+
+
+# Bar chart time
+def barchart(axis, values, names=[], sigma_list=[],
+             rotate_labels=False):
+
+    values_list = values
 
 #A function to get the right color when handling gradients
 def gradient_handler(gradient, gradient_vals, i, length, color_override):
@@ -507,9 +576,8 @@ def heatmap(axis, matrix, colormap="line_grad",
 # No way I can work out to transform a 2d plane where coordinates are X = blue intensity and Y = yellow intensity
 # into sensible polar coordinates, so the colorblind unfortunatley get griddied on by topology
 # Sorry Lorenzo
-def complex_heatmap(ax, complex_number_array, intensity_transform = lambda x: x):
-
-    two_pi = 2*np.pi
+def complex_heatmap(axis, complex_number_array, intensity_transform = lambda x: x,
+                    phasebar=True):
 
     theta_array = np.divide(np.add(np.angle(complex_number_array), np.pi), two_pi)
     magnitude_array = intensity_transform(np.abs(complex_number_array))
@@ -519,7 +587,17 @@ def complex_heatmap(ax, complex_number_array, intensity_transform = lambda x: x)
                     for normalized_magnitude, theta in zip(normalized_magnitude_list, theta_list)]
                    for normalized_magnitude_list, theta_list in zip(normalized_magnitude_array, theta_array)]
 
-    ax.imshow(color_array)
+    axis.imshow(color_array)
+
+    if phasebar:
+
+        heatmap_norm = mcolors.Normalize(vmin=0, vmax=two_pi)
+        scalar_mappable = cm.ScalarMappable(norm=heatmap_norm,
+                                            cmap = cmy_colormap)
+        colorbar = axis.figure.colorbar(scalar_mappable, ax=axis,
+                                        ticks=[0, np.pi, two_pi])
+        colorbar.ax.set_yticklabels(["0", "$\pi$", "$2\pi$"])
+
 
 # Bar chart time
 def barchart(axis, values, names=[], sigma_list=[],
