@@ -725,12 +725,20 @@ def ridgelinedf(figure,
         else:
             linecode = linecodes[i]
 
+        #Calculate a gradient if necessary
+        color_override = gradient_handler(gradient,
+                                          None,
+                                          j,
+                                          len(y),
+                                          None)
+
         # Plot the line
         plotline(ax_objs[-1],
                  x_list[i],
                  y_list[i],
                  colorcode = colorcode,
-                 linecode = linecode)
+                 linecode = linecode,
+                 color_override = color_override)
 
         # Make background transparent 
         rect = ax_objs[-1].patch
@@ -740,14 +748,14 @@ def ridgelinedf(figure,
         ax_objs[-1].set_yticklabels([])
         ax_objs[-1].tick_params(left=False)
 
+        # Remove the x ticks
+        ax_objs[-1].set_xticklabels([], minor =True)
+        ax_objs[-1].set_xticklabels([])
+        ax_objs[-1].set_xticks([], minor = True)
+        ax_objs[-1].set_xticks([])
+
     # Format all but the last axis
     for ax_obj in ax_objs[:-1]:
-        # Remove the x ticks
-        ax_obj.set_xticklabels([], minor =True)
-        ax_obj.set_xticklabels([])
-        ax_obj.set_xticks([], minor = True)
-        ax_obj.set_xticks([])
-
         # Remove the bottom line
         remove_box(ax_obj, lines = ["bottom"])
 
