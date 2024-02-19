@@ -122,7 +122,7 @@ def scatter(axis, x_vect, y_vect, y_sig_vect=None,
     else:
         color_to_plot = color_override
 
-    if y_sig_vect != None:
+    if type(y_sig_vect) != type(None):
 
         axis.errorbar(x_vect, y_vect, y_sig_vect,
                       color=color_to_plot,
