@@ -22,6 +22,14 @@ okabe_ito = ["#e69f00", #Orange
              "#0072B2", #Dark Blue
              "black","white"]
 
+imperial = ["#0000CC", #Blue
+            "#FE0000", #Red
+            "#00FFFF", #Yellow
+            "#3FE0D0", #Teal
+            "#7C68EE", #Purple
+            "#FF8B00", #Orange
+            "black", "white"]
+
 # Always do it
 two_pi = 2*np.pi
 
