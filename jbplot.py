@@ -24,10 +24,10 @@ okabe_ito = ["#e69f00", #Orange
 
 imperial = ["#0000CC", #Blue
             "#FE0000", #Red
-            "#00FFFF", #Yellow
-            "#3FE0D0", #Teal
+            "#FFFF00", #Yellow
             "#7C68EE", #Purple
-            "#FF8B00", #Orange
+            "#ee82ef", #Pink
+            "#00FF7F",  #Mint
             "black", "white"]
 
 # Always do it
