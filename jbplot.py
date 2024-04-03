@@ -1,4 +1,3 @@
-###31-Jan-2023
 ###Jonathan Bostock
 ###Plotting Module for Python: jbplot
 ###Requirements: matplotlib, numpy, pandas
@@ -40,11 +39,14 @@ lines = ["solid","dotted", "dashed", "dashdot",
         (5, (10,3)), (0, (3, 3, 1, 3, 1, 3)),(5, (10, 1, 3, 1)),(0, (1,3)),"none"]
 markf = ["s", "D", ">", "<", "^", "v","d","*","none"]
 markl = ["+", "x", "2", "1", "4", "3","|","_","none"]
-marks = {"f":markf,
-        "l":markl}
+markc = ["o"] * 8
+marks = {"f":   markf,
+         "l":    markl,
+         "c":   markc}
 #Table of marker sizes to make them look the same size
 marksizes = {"s":50, "D":40, "^":50, "v": 50, ">":50, "<":50, "d":50, "*":50,
-             "+":80, "x":50, "2":80, "1": 80, "4":80, "3":80, "|":80, "_":80}
+             "+":80, "x":50, "2":80, "1": 80, "4":80, "3":80, "|":80, "_":80,
+             "o":50}
 
 # Define our colormaps
     # Bilinear colormap for positive/negative values
@@ -104,7 +106,7 @@ colormap_dict = {"bilin":       bilinear_colormap,
                  "cmy":         cmy_colormap,
                  "auto":        lambda x, i: mcolors.LinearSegmentedColormap.from_list(
                      f"Auto",
-                     auto_colormap_lists[i])(0.2 + x * 0.6)}
+                     auto_colormap_lists[i])(0.15 + x * 0.7)}
 
 
 
@@ -153,21 +155,30 @@ def scatter(axis, x_vect, y_vect, y_sig_vect=None,
     mark = marks[marktype][markcode]
     marksize = marksizes[mark]
 
-    if marktype == "f":
-        axis.scatter(x_vect, y_vect,
-                     color=color_to_plot,
-                     edgecolors="black",
-                     marker=mark,
-                     s=marksize,
-                     zorder=2,
-                     **kwargs)
-    else:
-        axis.scatter(x_vect, y_vect,
-                     color="black",
-                     marker=mark,
-                     s=marksize,
-                     zorder=2,
-                     **kwargs)
+    match marktype:
+        case "f":
+            axis.scatter(x_vect, y_vect,
+                         color=color_to_plot,
+                         edgecolors="black",
+                         marker=mark,
+                         s=marksize,
+                         zorder=2,
+                         **kwargs)
+        case "l":
+            axis.scatter(x_vect, y_vect,
+                         color="black",
+                         marker=mark,
+                         s=marksize,
+                         zorder=2,
+                         **kwargs)
+        case "c":
+            axis.scatter(x_vect, y_vect,
+                         edgecolors="black",
+                         color=color_to_plot,
+                         marker=mark,
+                         s=marksize,
+                         zorder=2,
+                         **kwargs)
 
     #Note! this plotline does NOT take the kwargs. This might be a problem but
     #I don't really care yet since it doesn't come up very often
@@ -355,21 +366,13 @@ def scatterset(axis, x_vect_set, y_vect_set,
         if name_list == None: name = None
         else: name = name_list[i]
 
-        auto_gradient=False
-        #If we're doing a gradient of scatters, handle this here
-        if type(third_vars) != type(None):
-            gradient_code = split_set.index(split_list[i])
-            gradient_vals = third_vars
-            auto_gradient=True
-
-
         color_override = gradient_handler(gradient,
                                           gradient_vals,
                                           i,
                                           len(y_vect_set),
                                           color_override,
                                           gradient_code=gradient_code,
-                                          auto_gradient=auto_gradient)
+                                          auto_gradient=False)
 
         scatter(axis, x_vect, y_vect, y_sig_vect=y_sig_vect,
                 colorcode=j,linecode=linecode,
@@ -530,6 +533,8 @@ def plotdf(axis, df,
            name_list=None,
            plot_type="scatter",
            gradient_map = lambda x: x,
+           assemble_legend = False,
+           third_var_name_map=None,
            **kwargs):
 
     markcode_max=None
@@ -543,10 +548,10 @@ def plotdf(axis, df,
     if name == "y":
         name_list = y
     elif name != None:
-        if name_map == None:
-            name_list = df[name].drop_duplicates().tolist()
-        else:
-            name_list = [name_map(n) for n in df[name].drop_duplicates()]
+        if name_map is None:
+            name_map = lambda x: f"{name} = {x}"
+
+        name_list = [name_map(n) for n in df[name].drop_duplicates()]
 
     #If we're not splitting by variable, check if x is passed as a list
     if split == None:
@@ -578,12 +583,12 @@ def plotdf(axis, df,
     # Awful hacky variable renaming
     if isinstance(split_list, list) and isinstance(third_var_list, list):
 
-        working_list = []
-        for s in split_list:
+        second_var_list = split_list.copy()
+        split_list = []
+        for s in second_var_list:
             for t in third_var_list:
-                working_list.append((s,t))
+                split_list.append((s,t))
 
-        split_list = working_list
         double_split = True
 
     # Bad bad bad
@@ -613,6 +618,29 @@ def plotdf(axis, df,
         else:
             gradient_list = [gradient_map(s_item) for s_item in split_list]
 
+    # Generate a cool legend
+    if assemble_legend:
+        if double_split:
+            if third_var_name_map is None:
+                third_var_name_map = lambda x: f"{third_var} = {x}"
+
+            for i, t in enumerate(list(dict.fromkeys(third_var_list))):
+                scatter(axis, [],[], label=third_var_name_map(t),color_override="#808080",
+                        markcode=i)
+
+            if name_map is None:
+                name_map = lambda x: f"{split} = {x}"
+
+            scatterset(axis, [[]] * len(second_var_list), [[]] * len(second_var_list),
+                       gradient=gradient, gradient_vals = second_var_list,
+                       marktype="c",
+                       name_list=[name_map(s) for s in second_var_list])
+
+        nice_legend(axis)
+        axis.set_xlabel(x)
+        axis.set_ylabel(y)
+
+
     # Call scatterset or plotlineset
     if "scatter" in plot_type:
         scatterset(axis, x_vect_set, y_vect_set,
@@ -629,7 +657,6 @@ def plotdf(axis, df,
                     gradient=gradient,
                     gradient_vals=gradient_list,
                     name_list=name_list,
-                    third_vars=third_var_list,
                     **kwargs)
 
 # Function which plots a heatmap

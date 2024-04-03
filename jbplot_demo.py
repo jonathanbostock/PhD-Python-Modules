@@ -14,7 +14,8 @@ jbplot.plotdf(ax, data,
               y="Score",
               split="n_good",
               third_var="size",
-              gradient=True)
+              gradient=True,
+              assemble_legend=True)
 
 jbplot.save(fig, "Demo Figure",
             file_types=["png"])
