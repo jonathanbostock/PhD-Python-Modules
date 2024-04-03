@@ -84,23 +84,22 @@ bw_colormap = mcolors.LinearSegmentedColormap.from_list("bw",
                                                         bw_list)
 cmy_colormap = mcolors.LinearSegmentedColormap.from_list("cmy",
                                                          cmy_list)
-
-# Make a dictionary of colormaps
-colormap_dict = {"bilin":bilinear_colormap,
-                 "lin":linear_colormap,
-                 "lin2":linear_colormap_2,
-                 "line_grad":line_grad_colormap,
-                 "line_grad_b":line_grad_colormap_backup,
-                 "cyc":cyclic_colormap,
-                 "afm":afm_colormap,
-                 "bw":bw_colormap,
-                 "cmy":cmy_colormap}
-
 auto_colormap_list = [lambda x: mcolors.LinearSegmentedColormap.from_list(f"Auto {i}",
                                                                           ["#000000",
                                                                            c,
                                                                            "#FFFFFF"])(0.25 + x/2)
                       for i, x in enumerate(colors[:-2])]
+
+# Make a dictionary of colormaps
+colormap_dict = {"bilin":       bilinear_colormap,
+                 "lin":         linear_colormap,
+                 "lin2":        linear_colormap_2,
+                 "line_grad":   [line_grad_colormap, line_grad_colormap_backup],
+                 "cyc":         cyclic_colormap,
+                 "afm":         afm_colormap,
+                 "bw":          bw_colormap,
+                 "cmy":         cmy_colormap,
+                 "auto":        auto_colormap_list}
 
 
 """
@@ -282,7 +281,7 @@ def barchart(axis, values, names=[], sigma_list=[],
     values_list = values
 
 #A function to get the right color when handling gradients
-def gradient_handler(gradient, gradient_vals, i, length, color_override):
+def gradient_handler(gradient, gradient_vals, i, length, color_override, gradient_code=0):
 
     if gradient==True:
 
@@ -294,7 +293,7 @@ def gradient_handler(gradient, gradient_vals, i, length, color_override):
             s /= (max(gradient_vals)-min(gradient_vals))
 
 
-        return line_grad_colormap(s)
+        return colormap_dict["line_grad"][gradient_code](s)
 
     else:
         return color_override
@@ -312,6 +311,7 @@ def scatterset(axis, x_vect_set, y_vect_set,
                name_list=None,
                gradient=False,
                gradient_vals=None,
+               gradient_code=0,
                color_override=None,
                **kwargs):
 
@@ -344,7 +344,8 @@ def scatterset(axis, x_vect_set, y_vect_set,
                                           gradient_vals,
                                           i,
                                           len(y_vect_set),
-                                          color_override)
+                                          color_override,
+                                          gradient_code=gradient_code)
 
         scatter(axis, x_vect, y_vect, y_sig_vect=y_sig_vect,
                 colorcode=j,linecode=linecode,
@@ -361,6 +362,7 @@ def plotlineset(axis, x_vect_set, y_vect_set,
                 gradient=False,
                 gradient_vals=None,
                 name_list=None,
+                gradient_code=0,
                 **kwargs):
 
     y_sig_vect=None
@@ -378,7 +380,8 @@ def plotlineset(axis, x_vect_set, y_vect_set,
                                           gradient_vals,
                                           i,
                                           len(y_vect_set),
-                                          color_override)
+                                          color_override,
+                                          gradient_code=gradient_code)
 
         if gradient != False:
             j = 0
@@ -453,6 +456,7 @@ def plot2dfun(axis, function,
               sig_function = None,
               gradient=False,
               name_list=None,
+              gradient_code=0,
               **kwargs):
 
     color_override = None
@@ -467,7 +471,8 @@ def plot2dfun(axis, function,
                                               second_var,
                                               i,
                                               len(second_var),
-                                              color_override)
+                                              color_override,
+                                              gradient_code=gradient_code)
 
         if sig_function != None:
             sig_function_curried = lambda x: sig_function(x, var)
@@ -706,7 +711,8 @@ def ridgelinedf(figure,
                 overlap = 0.5,
                 axis_names = None,
                 legend_names = None,
-                x_axis_name = None):
+                x_axis_name = None,
+                gradient_code=0):
 
     x_list = [data_frame.loc[:,x_item] for x_item in x]
     y_list = [data_frame.loc[:,y_item] for y_item in y]
@@ -747,7 +753,8 @@ def ridgelinedf(figure,
                                           None,
                                           j,
                                           len(y),
-                                          None)
+                                          None,
+                                          gradient_code=gradient_code)
 
         # Plot the line
         plotline(ax_objs[-1],
