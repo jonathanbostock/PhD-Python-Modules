@@ -38,7 +38,7 @@ colors = okabe_ito
 
 lines = ["solid","dotted", "dashed", "dashdot",
         (5, (10,3)), (0, (3, 3, 1, 3, 1, 3)),(5, (10, 1, 3, 1)),(0, (1,3)),"none"]
-markf = ["s", "o", "^", "v", ">", "<","d","*","none"]
+markf = ["s", "D", "^", "v", ">", "<","d","*","none"]
 markl = ["+", "x", "2", "1", "4", "3","|","_","none"]
 marks = {"f":markf,
         "l":markl}
@@ -72,8 +72,6 @@ bilinear_colormap = mcolors.LinearSegmentedColormap.from_list("bilin",
                                                               bilin_list)
 linear_colormap = mcolors.LinearSegmentedColormap.from_list("lin",
                                                             lin_list)
-line_grad_colormap = matplotlib.colormaps["viridis"]
-line_grad_colormap_backup = lambda x: matplotlib.colormaps["plasma"](0.8*x + 0.1)
 linear_colormap_2 = mcolors.LinearSegmentedColormap.from_list("lin2",
                                                             lin_list_2)
 cyclic_colormap = mcolors.LinearSegmentedColormap.from_list("cyc",
@@ -84,22 +82,27 @@ bw_colormap = mcolors.LinearSegmentedColormap.from_list("bw",
                                                         bw_list)
 cmy_colormap = mcolors.LinearSegmentedColormap.from_list("cmy",
                                                          cmy_list)
-auto_colormap_list = [lambda x: mcolors.LinearSegmentedColormap.from_list(f"Auto {i}",
-                                                                          ["#000000",
-                                                                           c,
-                                                                           "#FFFFFF"])(0.25 + x/2)
-                      for i, x in enumerate(colors[:-2])]
+line_grad_colormap = matplotlib.colormaps["viridis"]
+line_grad_colormap_1 = lambda x: matplotlib.colormaps["plasma"](0.9*x)
+line_grad_colormap_2 = lambda x: matplotlib.colormaps["magma"](0.7*x + 0.2)
+
+# Auto colormaps
+auto_colormap_lists = [[[0, "#000000"], [0.5, c], [1, "#FFFFFF"]] for c in colors]
+
 
 # Make a dictionary of colormaps
 colormap_dict = {"bilin":       bilinear_colormap,
                  "lin":         linear_colormap,
                  "lin2":        linear_colormap_2,
-                 "line_grad":   [line_grad_colormap, line_grad_colormap_backup],
+                 "line_grad":   [line_grad_colormap, line_grad_colormap_1, line_grad_colormap_2],
                  "cyc":         cyclic_colormap,
                  "afm":         afm_colormap,
                  "bw":          bw_colormap,
                  "cmy":         cmy_colormap,
-                 "auto":        auto_colormap_list}
+                 "auto":        lambda x, i: mcolors.LinearSegmentedColormap.from_list(
+                     f"Auto",
+                     auto_colormap_lists[i])(0.2 + x * 0.6)}
+
 
 
 """
@@ -121,7 +124,6 @@ It all comes back to plotline in the end.
     onto the axes? It was then that I carried the whole module"
         - jbplot.plotline
 """
-
 
 # This is our other workhorse (although like any good function in this package
 # it still calls plotline)
@@ -274,14 +276,14 @@ def complex_scatter(axis, x_vect, y_vect, marktype = "f",
         colorbar.ax.set_yticklabels(["0", "$\pi$", "$2\pi$"])
 
 
-# Bar chart time
-def barchart(axis, values, names=[], sigma_list=[],
-             rotate_labels=False):
+def figax():
 
-    values_list = values
+    fig, ax = plt.subplots(1,1,figsize=[4,4])
+    return fig, ax
 
 #A function to get the right color when handling gradients
-def gradient_handler(gradient, gradient_vals, i, length, color_override, gradient_code=0):
+def gradient_handler(gradient, gradient_vals, i, length,
+                     color_override, gradient_code=0, auto_gradient=False):
 
     if gradient==True:
 
@@ -292,8 +294,10 @@ def gradient_handler(gradient, gradient_vals, i, length, color_override, gradien
             s = (gradient_vals[i]-min(gradient_vals))
             s /= (max(gradient_vals)-min(gradient_vals))
 
-
-        return colormap_dict["line_grad"][gradient_code](s)
+        if auto_gradient:
+            return colormap_dict["auto"](s, gradient_code)
+        else:
+            return colormap_dict["line_grad"][gradient_code](s)
 
     else:
         return color_override
@@ -312,8 +316,17 @@ def scatterset(axis, x_vect_set, y_vect_set,
                gradient=False,
                gradient_vals=None,
                gradient_code=0,
+               third_vars=None,
                color_override=None,
+               markcode_max=None,
                **kwargs):
+
+    if markcode_max == None:
+        markcode_max = len(marks[marktype])
+
+    if type(third_vars) != type(None):
+        split_set = list(dict.fromkeys(gradient_vals))
+        split_list = gradient_vals
 
     for i in range(len(y_vect_set)):
 
@@ -339,17 +352,25 @@ def scatterset(axis, x_vect_set, y_vect_set,
         if name_list == None: name = None
         else: name = name_list[i]
 
+        auto_gradient=False
         #If we're doing a gradient of scatters, handle this here
+        if type(third_vars) != type(None):
+            gradient_code = split_set.index(split_list[i])
+            gradient_vals = third_vars
+            auto_gradient=True
+
+
         color_override = gradient_handler(gradient,
                                           gradient_vals,
                                           i,
                                           len(y_vect_set),
                                           color_override,
-                                          gradient_code=gradient_code)
+                                          gradient_code=gradient_code,
+                                          auto_gradient=auto_gradient)
 
         scatter(axis, x_vect, y_vect, y_sig_vect=y_sig_vect,
                 colorcode=j,linecode=linecode,
-                marktype=marktype,markcode=j,
+                marktype=marktype,markcode=j%markcode_max,
                 label=name,
                 color_override=color_override,
                 **kwargs)
@@ -361,8 +382,10 @@ def plotlineset(axis, x_vect_set, y_vect_set,
                 type_start=0,
                 gradient=False,
                 gradient_vals=None,
-                name_list=None,
                 gradient_code=0,
+                third_vars=None,
+                name_list=None,
+                markcode_max=None,
                 **kwargs):
 
     y_sig_vect=None
@@ -381,7 +404,8 @@ def plotlineset(axis, x_vect_set, y_vect_set,
                                           i,
                                           len(y_vect_set),
                                           color_override,
-                                          gradient_code=gradient_code)
+                                          gradient_code=gradient_code,
+                                          auto_gradient=auto_gradient)
 
         if gradient != False:
             j = 0
@@ -495,6 +519,7 @@ def plot2dfun(axis, function,
 def plotdf(axis, df,
            x="x", y="y",
            y_sig=None, split=None,
+           third_var=None,
            gradient=False,
            sort_x=False,
            name=None,
@@ -504,8 +529,11 @@ def plotdf(axis, df,
            gradient_map = lambda x: x,
            **kwargs):
 
+    markcode_max=None
+    double_split = False
     y_sig_vect_set =None
     split_list=None
+    third_var_list=None
     gradient_list = None
 
     #If we get passed a column for sample names, then make a list of them
@@ -540,6 +568,33 @@ def plotdf(axis, df,
     if isinstance(split, str):
         split_list = df[split].drop_duplicates().tolist()
 
+    if isinstance(third_var, str):
+        third_var_list = df[third_var].drop_duplicates().tolist()
+        markcode_max = len(third_var_list)
+
+    # Awful hacky variable renaming
+    if isinstance(split_list, list) and isinstance(third_var_list, list):
+
+        working_list = []
+        for s in split_list:
+            for t in third_var_list:
+                working_list.append((s,t))
+
+        split_list = working_list
+        double_split = True
+
+    # Bad bad bad
+    if double_split:
+        x_vect_set = []
+        y_vect_set = []
+        third_var_list = []
+        for s in split_list:
+            df_split = df.loc[df[split]==s[0]]
+            x_vect_set.append(df_split.loc[df_split[third_var]==s[1]][x].tolist())
+            y_vect_set.append(df_split.loc[df_split[third_var]==s[1]][y].tolist())
+            third_var_list.append(s[1])
+
+    elif isinstance(split, str):
         x_vect_set = [df.loc[df[split]==s][x].tolist() for s in split_list]
         y_vect_set = [df.loc[df[split]==s][y].tolist() for s in split_list]
 
@@ -550,9 +605,10 @@ def plotdf(axis, df,
     if gradient:
         if type(y) == list:
             gradient_list = [gradient_map(y_item) for y_item in y]
+        elif double_split:
+            gradient_list = [gradient_map(s[0]) for s in split_list]
         else:
             gradient_list = [gradient_map(s_item) for s_item in split_list]
-
 
     # Call scatterset or plotlineset
     if "scatter" in plot_type:
@@ -561,6 +617,8 @@ def plotdf(axis, df,
                    gradient=gradient,
                    gradient_vals=gradient_list,
                    name_list=name_list,
+                   third_vars=third_var_list,
+                   markcode_max=markcode_max,
                    **kwargs)
     if "line" in plot_type:
         plotlineset(axis, x_vect_set, y_vect_set,
@@ -568,6 +626,7 @@ def plotdf(axis, df,
                     gradient=gradient,
                     gradient_vals=gradient_list,
                     name_list=name_list,
+                    third_vars=third_var_list,
                     **kwargs)
 
 # Function which plots a heatmap
