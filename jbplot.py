@@ -38,12 +38,12 @@ colors = okabe_ito
 
 lines = ["solid","dotted", "dashed", "dashdot",
         (5, (10,3)), (0, (3, 3, 1, 3, 1, 3)),(5, (10, 1, 3, 1)),(0, (1,3)),"none"]
-markf = ["s", "D", "^", "v", ">", "<","d","*","none"]
+markf = ["s", "D", ">", "<", "^", "v","d","*","none"]
 markl = ["+", "x", "2", "1", "4", "3","|","_","none"]
 marks = {"f":markf,
         "l":markl}
 #Table of marker sizes to make them look the same size
-marksizes = {"s":50, "o":50, "^":50, "v": 50, ">":50, "<":50, "d":50, "*":50,
+marksizes = {"s":50, "D":40, "^":50, "v": 50, ">":50, "<":50, "d":50, "*":50,
              "+":80, "x":50, "2":80, "1": 80, "4":80, "3":80, "|":80, "_":80}
 
 # Define our colormaps
@@ -65,6 +65,10 @@ bw_list = [(0, "#000000"), (1, "#FFFFFF")]
 cmy_list = [(0, "#ff708f"), (1/7, "#ffde21"), (2/7, "#b3ff4c"),
             (3/7, "#46ffb9"), (4/7, "#24dbff"), (5/7, "#926dff"),
             (6/7, "#ff00ff"), (1, "#ff708f")]
+    # Grey/grey colormap
+grey_list = [(0, "#404040"), (1, "#BFBFBF")]
+    # Auto colormaps
+auto_colormap_lists = [[[0, "#000000"], [0.5, c], [1, "#FFFFFF"]] for c in colors]
 
 
 # Convert colormap lists to colormaps
@@ -82,12 +86,11 @@ bw_colormap = mcolors.LinearSegmentedColormap.from_list("bw",
                                                         bw_list)
 cmy_colormap = mcolors.LinearSegmentedColormap.from_list("cmy",
                                                          cmy_list)
+grey_colormap = mcolors.LinearSegmentedColormap.from_list("grey",
+                                                          grey_list)
 line_grad_colormap = matplotlib.colormaps["viridis"]
 line_grad_colormap_1 = lambda x: matplotlib.colormaps["plasma"](0.9*x)
 line_grad_colormap_2 = lambda x: matplotlib.colormaps["magma"](0.7*x + 0.2)
-
-# Auto colormaps
-auto_colormap_lists = [[[0, "#000000"], [0.5, c], [1, "#FFFFFF"]] for c in colors]
 
 
 # Make a dictionary of colormaps
