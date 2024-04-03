@@ -73,6 +73,7 @@ bilinear_colormap = mcolors.LinearSegmentedColormap.from_list("bilin",
 linear_colormap = mcolors.LinearSegmentedColormap.from_list("lin",
                                                             lin_list)
 line_grad_colormap = matplotlib.colormaps["viridis"]
+line_grad_colormap_backup = lambda x: matplotlib.colormaps["plasma"](0.8*x + 0.1)
 linear_colormap_2 = mcolors.LinearSegmentedColormap.from_list("lin2",
                                                             lin_list_2)
 cyclic_colormap = mcolors.LinearSegmentedColormap.from_list("cyc",
@@ -89,10 +90,18 @@ colormap_dict = {"bilin":bilinear_colormap,
                  "lin":linear_colormap,
                  "lin2":linear_colormap_2,
                  "line_grad":line_grad_colormap,
+                 "line_grad_b":line_grad_colormap_backup,
                  "cyc":cyclic_colormap,
                  "afm":afm_colormap,
                  "bw":bw_colormap,
                  "cmy":cmy_colormap}
+
+auto_colormap_list = [lambda x: mcolors.LinearSegmentedColormap.from_list(f"Auto {i}",
+                                                                          ["#000000",
+                                                                           c,
+                                                                           "#FFFFFF"])(0.25 + x/2)
+                      for i, x in enumerate(colors[:-2])]
+
 
 """
 Code calling order is:
