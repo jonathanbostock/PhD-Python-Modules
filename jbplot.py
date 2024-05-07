@@ -69,6 +69,11 @@ cmy_list = [(0, "#ff708f"), (1/7, "#ffde21"), (2/7, "#b3ff4c"),
             (6/7, "#ff00ff"), (1, "#ff708f")]
     # Grey/grey colormap
 grey_list = [(0, "#404040"), (1, "#BFBFBF")]
+    # Okabe-Ito Fire colormap
+fire_list = [(0, okabe_ito[5]), (1, okabe_ito[3])]
+water_list = [(0, "#01397d"), (1, "#67ffd6")]
+ice_list = [(0, "#892e60"), (1, "#56b4e9")]
+
     # Auto colormaps
 auto_colormap_lists = [[[0, "#000000"], [0.5, c], [1, "#FFFFFF"]] for c in colors]
 
@@ -93,6 +98,12 @@ grey_colormap = mcolors.LinearSegmentedColormap.from_list("grey",
 line_grad_colormap = matplotlib.colormaps["viridis"]
 line_grad_colormap_1 = lambda x: matplotlib.colormaps["plasma"](0.9*x)
 line_grad_colormap_2 = lambda x: matplotlib.colormaps["magma"](0.7*x + 0.2)
+fire_colormap = mcolors.LinearSegmentedColormap.from_list("fire",
+                                                          fire_list)
+water_colormap = mcolors.LinearSegmentedColormap.from_list("water",
+                                                           water_list)
+ice_colormap = mcolors.LinearSegmentedColormap.from_list("ice",
+                                                         ice_list)
 
 
 # Make a dictionary of colormaps
@@ -104,6 +115,10 @@ colormap_dict = {"bilin":       bilinear_colormap,
                  "afm":         afm_colormap,
                  "bw":          bw_colormap,
                  "cmy":         cmy_colormap,
+                 "grey":        grey_colormap,
+                 "fire":        fire_colormap,
+                 "water":       water_colormap,
+                 "ice":         ice_colormap,
                  "auto":        lambda x, i: mcolors.LinearSegmentedColormap.from_list(
                      f"Auto",
                      auto_colormap_lists[i])(0.15 + x * 0.7)}
