@@ -425,8 +425,7 @@ def plotlineset(axis, x_vect_set, y_vect_set,
                                           i,
                                           len(y_vect_set),
                                           color_override,
-                                          gradient_code=gradient_code,
-                                          auto_gradient=auto_gradient)
+                                          gradient_code=gradient_code)
 
         if gradient != False:
             j = 0
