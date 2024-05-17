@@ -71,8 +71,8 @@ cmy_list = [(0, "#ff708f"), (1/7, "#ffde21"), (2/7, "#b3ff4c"),
 grey_list = [(0, "#404040"), (1, "#BFBFBF")]
     # Okabe-Ito Fire colormap
 fire_list = [(0, okabe_ito[5]), (1, okabe_ito[3])]
-water_list = [(0, "#01397d"), (1, "#67ffd6")]
-ice_list = [(0, "#892e60"), (1, "#56b4e9")]
+water_list = [(0, "#01397d"), (0.5, "#339aa9"), (1, "#67ffd6")]
+ice_list = [(0, "#c3478b"), (0.5, "#a072b6"), (1, "#7dc8f2")]
 
     # Auto colormaps
 auto_colormap_lists = [[[0, "#000000"], [0.5, c], [1, "#FFFFFF"]] for c in colors]
@@ -110,7 +110,8 @@ ice_colormap = mcolors.LinearSegmentedColormap.from_list("ice",
 colormap_dict = {"bilin":       bilinear_colormap,
                  "lin":         linear_colormap,
                  "lin2":        linear_colormap_2,
-                 "line_grad":   [line_grad_colormap, line_grad_colormap_1, line_grad_colormap_2],
+                 "line_grad":   [line_grad_colormap, line_grad_colormap_1, line_grad_colormap_2,
+                                 fire_colormap, water_colormap, ice_colormap],
                  "cyc":         cyclic_colormap,
                  "afm":         afm_colormap,
                  "bw":          bw_colormap,
@@ -549,6 +550,7 @@ def plotdf(axis, df,
            gradient_map = lambda x: x,
            assemble_legend = False,
            third_var_name_map=None,
+           gradient_list = None,
            **kwargs):
 
     markcode_max=None
@@ -556,19 +558,18 @@ def plotdf(axis, df,
     y_sig_vect_set =None
     split_list=None
     third_var_list=None
-    gradient_list = None
 
     #If we get passed a column for sample names, then make a list of them
     if name == "y":
         name_list = y
-    elif name != None:
+    elif name is not None:
         if name_map is None:
             name_map = lambda x: f"{name} = {x}"
 
         name_list = [name_map(n) for n in df[name].drop_duplicates()]
 
     #If we're not splitting by variable, check if x is passed as a list
-    if split == None:
+    if split is None:
         if isinstance(x, list):
             x_vect_set = [df[x_inst] for x_inst in x]
         else:
@@ -579,7 +580,7 @@ def plotdf(axis, df,
         else:
             y_vect_set = [df[y].tolist()]
 
-        if y_sig != None:
+        if y_sig is not None:
             #Must also check for lists here
             if isinstance(y_sig, list):
                 y_sig_vect_set = [df[y_sig_inst].tolist() for y_sig_inst in y_sig]
@@ -624,7 +625,7 @@ def plotdf(axis, df,
             y_sig_vect_set = [df.loc[df[split]==s][y_sig].tolist() for s in split_list]
 
     # Handle the gradient if a map is needed
-    if gradient:
+    if gradient and gradient_list is None:
         if type(y) == list:
             gradient_list = [gradient_map(y_item) for y_item in y]
         elif double_split:
