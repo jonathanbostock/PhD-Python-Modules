@@ -12,13 +12,13 @@ import numpy as np
 import pandas as pd
 
 #Define our styles, these can be changed rapidly which is the point
-okabe_ito = ["#e69f00", #Orange
-             "#56B4E9", #Light Blue
+okabe_ito = ["#D55E00", #Dark Reddish-orange
+             "#0072B2", #Dark Blue
              "#009E73", #Teal
              "#F0E442", #Pale Yellow
              "#CC79A7", #Pink
-             "#D55E00", #Dark Reddish-orange
-             "#0072B2", #Dark Blue
+             "#56B4E9", #Light Blue
+             "#e69f00", #Orange
              "black","white"]
 
 imperial = ["#0000CC", #Blue
@@ -46,7 +46,7 @@ marks = {"f":   markf,
 #Table of marker sizes to make them look the same size
 marksizes = {"s":50, "D":40, "^":50, "v": 50, ">":50, "<":50, "d":50, "*":50,
              "+":80, "x":50, "2":80, "1": 80, "4":80, "3":80, "|":80, "_":80,
-             "o":50}
+             "o":50, "none": 0}
 
 # Define our colormaps
     # Bilinear colormap for positive/negative values
