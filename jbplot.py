@@ -12,8 +12,8 @@ import numpy as np
 import pandas as pd
 
 #Define our styles, these can be changed rapidly which is the point
-okabe_ito = ["#D55E00", #Dark Reddish-orange
-             "#0072B2", #Dark Blue
+okabe_ito = ["#0072B2", #Dark Blue,
+             "#D55E00", #Dark Reddish-orange
              "#009E73", #Teal
              "#F0E442", #Pale Yellow
              "#CC79A7", #Pink
@@ -24,9 +24,10 @@ okabe_ito = ["#D55E00", #Dark Reddish-orange
 imperial = ["#0000CC", #Blue
             "#FE0000", #Red
             "#FFFF00", #Yellow
+            "#00FF7F", #Mint
             "#ee82ef", #Pink
-            "#00FF7F",  #Mint
-            "#7C68EE", #Purple
+            "#ff8b00", #Orange
+            "#7cee68", #Purple
             "black", "white"]
 
 # Always do it
