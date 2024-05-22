@@ -64,6 +64,10 @@ afm_list = [(0, "#000000"), (0.23,"#420E67"), (0.50, "#5252C4"),
             (0.75, "#7ECCCF"), (1, "#EEEEEE")]
     # Black/white colormap
 bw_list = [(0, "#000000"), (1, "#FFFFFF")]
+# Blue-orange colormap for complexj
+bgw_list = [(0, "#000000"), (0.5, "#878787"), (1, "#ffffff")]
+bgo_list = [(0, "#0080ff"), (0.5, "#878787"), (1, "#ff8000")]
+wobb_list = [(0, "#FFFFFF"), (0.25, "#ff8000"), (0.5, "#000000"), (0.75, "#0080ff"), (1, "#FFFFFF")]
     # Cmy colormap
 cmy_list = [(0, "#ff708f"), (1/7, "#ffde21"), (2/7, "#b3ff4c"),
             (3/7, "#46ffb9"), (4/7, "#24dbff"), (5/7, "#926dff"),
@@ -96,6 +100,12 @@ cmy_colormap = mcolors.LinearSegmentedColormap.from_list("cmy",
                                                          cmy_list)
 grey_colormap = mcolors.LinearSegmentedColormap.from_list("grey",
                                                           grey_list)
+bgo_colormap = mcolors.LinearSegmentedColormap.from_list("bgo",
+                                                         bgo_list)
+bgw_colormap = mcolors.LinearSegmentedColormap.from_list("bgw",
+                                                         bgw_list)
+wobb_colormap = mcolors.LinearSegmentedColormap.from_list("wobb",
+                                                          wobb_list)
 line_grad_colormap = matplotlib.colormaps["viridis"]
 line_grad_colormap_1 = lambda x: matplotlib.colormaps["plasma"](0.9*x)
 line_grad_colormap_2 = lambda x: matplotlib.colormaps["magma"](0.7*x + 0.2)
@@ -116,6 +126,9 @@ colormap_dict = {"bilin":       bilinear_colormap,
                  "cyc":         cyclic_colormap,
                  "afm":         afm_colormap,
                  "bw":          bw_colormap,
+                 "bgw":         bgw_colormap,
+                 "bgo":         bgo_colormap,
+                 "wobb":        wobb_colormap,
                  "cmy":         cmy_colormap,
                  "grey":        grey_colormap,
                  "fire":        fire_colormap,
@@ -703,16 +716,37 @@ def heatmap(axis, matrix, colormap="line_grad",
 # No way I can work out to transform a 2d plane where coordinates are X = blue intensity and Y = yellow intensity
 # into sensible polar coordinates, so the colorblind unfortunatley get griddied on by topology
 # Sorry Lorenzo
+
+def get_complex_color(complex_value, scale=1):
+
+    theta = np.angle(complex_value)
+    real_value = (np.tanh(np.real(complex_value / scale)) + 1)/2
+    imag_value = (np.tanh(np.imag(complex_value / scale)) + 1)/2
+
+    real_color = np.array(bgw_colormap(real_value))[0:3] 
+    imag_color = np.array(bgo_colormap(imag_value))[0:3]
+
+    final_color = list(real_color * np.cos(theta)**2 + imag_color * np.sin(theta)**2)
+
+    return final_color
+
 def complex_heatmap(axis, complex_number_array, intensity_transform = lambda x: x,
                     phasebar=True):
-
+    """
     theta_array = np.divide(np.add(np.angle(complex_number_array), np.pi), two_pi)
     magnitude_array = intensity_transform(np.abs(complex_number_array))
     normalized_magnitude_array = np.divide(magnitude_array, np.max(magnitude_array))
+    """
 
+    """
     color_array = [[np.array(cmy_colormap(theta)[0:3]) * normalized_magnitude
                     for normalized_magnitude, theta in zip(normalized_magnitude_list, theta_list)]
                    for normalized_magnitude_list, theta_list in zip(normalized_magnitude_array, theta_array)]
+    """
+
+    color_array = [[get_complex_color(c)
+                    for c in complex_number_list]
+                   for complex_number_list in complex_number_array]
 
     axis.imshow(color_array)
 
@@ -720,7 +754,7 @@ def complex_heatmap(axis, complex_number_array, intensity_transform = lambda x: 
 
         heatmap_norm = mcolors.Normalize(vmin=0, vmax=two_pi)
         scalar_mappable = cm.ScalarMappable(norm=heatmap_norm,
-                                            cmap = cmy_colormap)
+                                            cmap = wobb_colormap)
         colorbar = axis.figure.colorbar(scalar_mappable, ax=axis,
                                         ticks=[0, np.pi, two_pi])
         colorbar.ax.set_yticklabels(["0", "$\pi$", "$2\pi$"])
