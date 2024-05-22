@@ -409,10 +409,10 @@ def plotlineset(axis, x_vect_set, y_vect_set,
                 third_vars=None,
                 name_list=None,
                 markcode_max=None,
+                color_override=None,
                 **kwargs):
 
     y_sig_vect=None
-    color_override = None
     name=None
 
     for i, y_vect in enumerate(y_vect_set):
@@ -750,6 +750,11 @@ def barchart(axis, values, names=[], sigma_list=[],
     if rotate_labels:
         #This line of code throws a "warning" but who cares it works
         axis.set_xticklabels(names, rotation=30, ha="right")
+
+    axis.spines["top"].set_position(("data", 0))
+    remove_box(axis, lines=["bottom", "right"])
+
+    axis.tick_params(axis="x", length=0)
 
 # Do I really need to comment what this function does?
 def barchart_label(axis, text, start, end, height, text_raise=0):
