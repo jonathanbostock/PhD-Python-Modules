@@ -274,7 +274,7 @@ def complex_plotline(axis, x_vect, y_vect, fill=True):
     points = np.array([x_coords, y_coords]).T.reshape(-1,1,2)
     segments = np.concatenate([points[:-1],points[1:]], axis=1)
 
-    line_collection = mcollections.LineCollection(segments, cmap=cmy_colormap)
+    line_collection = mcollections.LineCollection(segments, cmap=wobb_colormap)
     line_collection.set_array(y_theta_norm[1:-1])
     axis.add_collection(line_collection)
 
@@ -286,7 +286,7 @@ def complex_scatter(axis, x_vect, y_vect, marktype = "f",
 
     y_abs_vect = np.abs(y_vect)
     y_theta_norm = np.divide(np.add(np.angle(y_vect), np.pi), two_pi)
-    color_vect = [cmy_colormap(y_theta)[0:3] for y_theta in y_theta_norm]
+    color_vect = [wobb_colormap(y_theta)[0:3] for y_theta in y_theta_norm]
 
     mark = marks[marktype][markcode]
 
@@ -314,7 +314,7 @@ def complex_scatter(axis, x_vect, y_vect, marktype = "f",
 
         heatmap_norm = mcolors.Normalize(vmin=0, vmax=two_pi)
         scalar_mappable = cm.ScalarMappable(norm=heatmap_norm,
-                                            cmap = cmy_colormap)
+                                            cmap = wobb_colormap)
         colorbar = axis.figure.colorbar(scalar_mappable, ax=axis,
                                         ticks=[0, np.pi, two_pi])
         colorbar.ax.set_yticklabels(["0", "$\pi$", "$2\pi$"])
@@ -744,7 +744,10 @@ def complex_heatmap(axis, complex_number_array, intensity_transform = lambda x: 
                    for normalized_magnitude_list, theta_list in zip(normalized_magnitude_array, theta_array)]
     """
 
-    color_array = [[get_complex_color(c)
+    square_mag_list = np.power(np.abs(complex_number_array.flatten()), 2)
+    scale = np.sqrt(np.mean(square_mag_list)) * 1.5
+
+    color_array = [[get_complex_color(c, scale=scale)
                     for c in complex_number_list]
                    for complex_number_list in complex_number_array]
 
