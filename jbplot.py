@@ -75,13 +75,10 @@ cmy_list = [(0, "#ff708f"), (1/7, "#ffde21"), (2/7, "#b3ff4c"),
     # Grey/grey colormap
 grey_list = [(0, "#404040"), (1, "#BFBFBF")]
     # Okabe-Ito Fire colormap
-<<<<<<< HEAD
-fire_list = [(0,"#D55E00"), (1,  "#F0E442")]
-water_list = [(0, "#002654"), (0.5, "#19a6ba"), (1, "#b7ffec")]
-=======
+
 fire_list = [(0,"#D55E00"), (1, "#F0E422")]
 water_list = [(0, "#011e41"), (0.6, "#1eb9bc"), (1, "#b0ebdb")]
->>>>>>> dc067fb7d30ba4b16fca26c517662188b32fbaf9
+
 ice_list = [(0, "#c3478b"), (0.5, "#a072b6"), (1, "#7dc8f2")]
 
     # Auto colormaps
