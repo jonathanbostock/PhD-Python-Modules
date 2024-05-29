@@ -75,8 +75,8 @@ cmy_list = [(0, "#ff708f"), (1/7, "#ffde21"), (2/7, "#b3ff4c"),
     # Grey/grey colormap
 grey_list = [(0, "#404040"), (1, "#BFBFBF")]
     # Okabe-Ito Fire colormap
-fire_list = [(0, okabe_ito[5]), (1, okabe_ito[3])]
-water_list = [(0, "#01397d"), (0.5, "#339aa9"), (1, "#67ffd6")]
+fire_list = [(0,"#D55E00"), (1,  "#F0E442")]
+water_list = [(0, "#002654"), (0.5, "#19a6ba"), (1, "#b7ffec")]
 ice_list = [(0, "#c3478b"), (0.5, "#a072b6"), (1, "#7dc8f2")]
 
     # Auto colormaps
@@ -716,6 +716,9 @@ def heatmap(axis, matrix, colormap="line_grad",
 # No way I can work out to transform a 2d plane where coordinates are X = blue intensity and Y = yellow intensity
 # into sensible polar coordinates, so the colorblind unfortunatley get griddied on by topology
 # Sorry Lorenzo
+
+# Edit it now works! It's kinda janky though
+# white = +ve real, black = -ve real, blue = -ve imaginary, orange = +ve imaginary
 
 def get_complex_color(complex_value, scale=1):
 
