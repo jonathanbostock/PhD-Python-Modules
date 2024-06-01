@@ -108,7 +108,7 @@ bgw_colormap = mcolors.LinearSegmentedColormap.from_list("bgw",
                                                          bgw_list)
 wobb_colormap = mcolors.LinearSegmentedColormap.from_list("wobb",
                                                           wobb_list)
-line_grad_colormap = matplotlib.colormaps["viridis"]
+line_grad_colormap = lambda x: matplotlib.colormaps["viridis"](x)
 line_grad_colormap_1 = lambda x: matplotlib.colormaps["plasma"](0.9*x)
 line_grad_colormap_2 = lambda x: matplotlib.colormaps["magma"](0.7*x + 0.2)
 fire_colormap = mcolors.LinearSegmentedColormap.from_list("fire",
@@ -367,10 +367,10 @@ def scatterset(axis, x_vect_set, y_vect_set,
                markcode_max=None,
                **kwargs):
 
-    if markcode_max == None:
+    if markcode_max is None:
         markcode_max = len(marks[marktype])
 
-    if type(third_vars) != type(None):
+    if third_vars is not None:
         split_set = list(dict.fromkeys(gradient_vals))
         split_list = gradient_vals
 
@@ -567,6 +567,7 @@ def plotdf(axis, df,
            assemble_legend = False,
            third_var_name_map=None,
            gradient_list = None,
+           marktype="f",
            **kwargs):
 
     markcode_max=None
@@ -574,6 +575,9 @@ def plotdf(axis, df,
     y_sig_vect_set =None
     split_list=None
     third_var_list=None
+
+    if sort_x:
+        df =df.sort_values(x)
 
     #If we get passed a column for sample names, then make a list of them
     if name == "y":
@@ -681,6 +685,7 @@ def plotdf(axis, df,
                    name_list=name_list,
                    third_vars=third_var_list,
                    markcode_max=markcode_max,
+                   marktype=marktype,
                    **kwargs)
     if "line" in plot_type:
         plotlineset(axis, x_vect_set, y_vect_set,
@@ -691,14 +696,13 @@ def plotdf(axis, df,
                     **kwargs)
 
 # Function which plots a heatmap
-def heatmap(axis, matrix, colormap="line_grad",
+def heatmap(axis, matrix, colormap="viridis",
+            gradient_code = 0,
             legend=True,val_range = None):
 
-    matrix_list = flatten(matrix)
-
     if val_range == None:
-        val_min = matrix_list.min()
-        val_max = matrix_list.max()
+        val_min = np.min(matrix)
+        val_max = np.max(matrix)
     else:
         val_min = val_range[0]
         val_max = val_range[1]
@@ -707,11 +711,11 @@ def heatmap(axis, matrix, colormap="line_grad",
 
         heatmap_norm = mcolors.Normalize(vmin=val_min, vmax=val_max)
         scalar_mappable = cm.ScalarMappable(norm=heatmap_norm,
-                                            cmap = colormap_dict[colormap])
+                                            cmap = colormap)
 
         axis.figure.colorbar(scalar_mappable, ax=axis)
 
-    axis.imshow(matrix, cmap=colormap_dict[colormap], vmin=val_min, vmax = val_max)
+    axis.imshow(matrix, cmap=colormap, vmin=val_min, vmax = val_max)
 
 # Complex heatmap coz i'm smart and cool
 # Doesnt work for the colorblind sadly
