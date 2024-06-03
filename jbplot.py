@@ -1,4 +1,4 @@
-###Jonathan Bostock
+#)##Jonathan Bostock
 ###Plotting Module for Python: jbplot
 ###Requirements: matplotlib, numpy, pandas
 
@@ -8,6 +8,7 @@ import matplotlib.cm as cm
 import matplotlib.gridspec as grid_spec
 import matplotlib.collections as mcollections
 import matplotlib
+from adjustText import adjust_text
 import numpy as np
 import pandas as pd
 
@@ -167,8 +168,9 @@ It all comes back to plotline in the end.
 # Might add x_sig_vectors in the future (but these are kinda extra tbh)
 def scatter(axis, x_vect, y_vect, y_sig_vect=None,
             colorcode=0,linecode=-1,marktype = "f",
-            markcode=0,annotations=[],
-            ann_y_offset=1.6,
+            markcode=0,annotations=None,
+            ann_y_offset=0,
+            ann_x_offset=0,
             color_override = None,
             **kwargs):
 
@@ -221,10 +223,10 @@ def scatter(axis, x_vect, y_vect, y_sig_vect=None,
                  color_override = color_to_plot,
                  linecode=linecode)
 
-    if annotations != []:
+    if annotations is not None:
 
         for (x, y, label) in zip(x_vect, y_vect, annotations):
-            axis.annotate(label, (x,y+ann_y_offset))
+            axis.annotate(label, (x+ann_x_offset,y+ann_y_offset))
 
 #The workhorse of the module
 #The mighty plotline
@@ -561,6 +563,7 @@ def plotdf(axis, df,
            sort_x=False,
            name=None,
            name_map=None,
+           gradient_code=0,
            name_list=None,
            plot_type="scatter",
            gradient_map = lambda x: x,
@@ -568,6 +571,9 @@ def plotdf(axis, df,
            third_var_name_map=None,
            gradient_list = None,
            marktype="f",
+           annotations=None,
+           ann_y_offset=0,
+           ann_x_offset=0,
            **kwargs):
 
     markcode_max=None
@@ -668,6 +674,7 @@ def plotdf(axis, df,
 
             scatterset(axis, [[]] * len(second_var_list), [[]] * len(second_var_list),
                        gradient=gradient, gradient_vals = second_var_list,
+                       gradient_code=gradient_code,
                        marktype="c",
                        name_list=[name_map(s) for s in second_var_list])
 
@@ -675,6 +682,9 @@ def plotdf(axis, df,
         axis.set_xlabel(x)
         axis.set_ylabel(y)
 
+    if annotations is not None:
+        if type(annotations) != list:
+            annotations = list(df[annotations])
 
     # Call scatterset or plotlineset
     if "scatter" in plot_type:
@@ -682,16 +692,21 @@ def plotdf(axis, df,
                    y_sig_vect_set=y_sig_vect_set,
                    gradient=gradient,
                    gradient_vals=gradient_list,
+                   gradient_code=gradient_code,
                    name_list=name_list,
                    third_vars=third_var_list,
                    markcode_max=markcode_max,
                    marktype=marktype,
+                   annotations=annotations,
+                   ann_y_offset=ann_y_offset,
+                   ann_x_offset=ann_x_offset,
                    **kwargs)
     if "line" in plot_type:
         plotlineset(axis, x_vect_set, y_vect_set,
                     y_sig_vect_set = y_sig_vect_set,
                     gradient=gradient,
                     gradient_vals=gradient_list,
+                    gradient_code=gradient_code,
                     name_list=name_list,
                     **kwargs)
 
