@@ -11,6 +11,7 @@ import matplotlib
 from adjustText import adjust_text
 import numpy as np
 import pandas as pd
+from icecream import ic
 
 #Define our styles, these can be changed rapidly which is the point
 okabe_ito = ["#56B4E9", #Light Blue
@@ -788,34 +789,56 @@ def complex_heatmap(axis, complex_number_array, intensity_transform = lambda x: 
 
 
 # Bar chart time
-def barchart(axis, values, names=[], sigma_list=[],
-             rotate_labels=False):
+def barchart(axis, values, name_list=[], sigma_list=[],
+             groups=1, label_rotation=0):
+
+
+    barchart_colors = []
+    for color in colors:
+        for i in range(groups):
+            brightness_adjust = 0.35*(i-(groups-1)/2)/(groups+1)
+
+            old_color_hsv = matplotlib.colors.rgb_to_hsv(
+                matplotlib.colors.to_rgb(color))
+
+            new_brightness = old_color_hsv[2] + brightness_adjust
+            new_brightness = max(new_brightness, 0)
+            new_brightness = min(new_brightness, 1)
+
+            new_color_hsv = [old_color_hsv[0],
+                             old_color_hsv[1],
+                             new_brightness]
+            new_color = matplotlib.colors.hsv_to_rgb(new_color_hsv)
+
+            barchart_colors.append(new_color)
 
     values_list = values
 
     if type(values) == dict:
-        names = [k for k in values.keys()]
+        name_list = [k for k in values.keys()]
         values_list = [v for v in values.values()]
         if type(values_list[0]) == tuple:
             values_list = [v[0] for v in values.values()]
             sigma_list = [v[1] for v in values.values()]
 
-    if sigma_list == []:
-        axis.bar(names, values_list,
-                 color=colors)
+    if sigma_list is []:
+        axis.bar(name_list, values_list,
+                 color=barchart_colors)
     else:
-        axis.bar(names, values_list,
-                 color=colors,
+        axis.bar(name_list, values_list,
+                 color=barchart_colors,
                  yerr=sigma_list, capsize=5)
 
-    if rotate_labels:
-        #This line of code throws a "warning" but who cares it works
-        axis.set_xticklabels(names, rotation=30, ha="right")
 
     axis.spines["top"].set_position(("data", 0))
     remove_box(axis, lines=["bottom", "right"])
 
     axis.tick_params(axis="x", length=0)
+
+
+    #This line of code throws a "warning" but who cares it works
+    axis.set_xticks([x + 0.5 for x in range(len(name_list))])
+    axis.set_xticklabels(name_list, rotation=label_rotation, ha="right")
 
 # Do I really need to comment what this function does?
 def barchart_label(axis, text, start, end, height, text_raise=0):
