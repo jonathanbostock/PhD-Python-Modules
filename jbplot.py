@@ -790,11 +790,12 @@ def complex_heatmap(axis, complex_number_array, intensity_transform = lambda x: 
 
 # Bar chart time
 def barchart(axis, values, name_list=[], sigma_list=[],
-             groups=1, label_rotation=0):
+             groups=1, label_rotation=0,
+             max_color = 6):
 
 
     barchart_colors = []
-    for color in colors:
+    for color in colors[:max_color]:
         for i in range(groups):
             brightness_adjust = 0.35*(i-(groups-1)/2)/(groups+1)
 
@@ -821,14 +822,13 @@ def barchart(axis, values, name_list=[], sigma_list=[],
             values_list = [v[0] for v in values.values()]
             sigma_list = [v[1] for v in values.values()]
 
-    if sigma_list is []:
-        axis.bar(name_list, values_list,
-                 color=barchart_colors)
-    else:
+    if sigma_list:
         axis.bar(name_list, values_list,
                  color=barchart_colors,
                  yerr=sigma_list, capsize=5)
-
+    else:
+        axis.bar(name_list, values_list,
+                 color=barchart_colors)
 
     axis.spines["top"].set_position(("data", 0))
     remove_box(axis, lines=["bottom", "right"])
