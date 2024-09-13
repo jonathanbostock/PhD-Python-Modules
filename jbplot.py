@@ -8,7 +8,6 @@ import matplotlib.cm as cm
 import matplotlib.gridspec as grid_spec
 import matplotlib.collections as mcollections
 import matplotlib
-from adjustText import adjust_text
 import numpy as np
 import pandas as pd
 from icecream import ic
@@ -373,7 +372,7 @@ def scatterset(axis, x_vect_set, y_vect_set,
     if markcode_max is None:
         markcode_max = len(marks[marktype])
 
-    if third_vars is not None:
+    if (third_vars is not None) and gradient:
         split_set = list(dict.fromkeys(gradient_vals))
         split_list = gradient_vals
 
@@ -556,26 +555,26 @@ def plot2dfun(axis, function,
 #Extremely handy function for plotting from dataframes
 #You can really abuse this thing with what you pass it and it handles most things
 #Long form, short form, multiple X, if you really want you don't even need to give it anything but an axis and a dataframe
-def plotdf(axis, df,
-           x="x", y="y",
-           y_sig=None, split=None,
-           third_var=None,
-           gradient=False,
-           sort_x=False,
-           name=None,
-           name_map=None,
-           gradient_code=0,
-           name_list=None,
-           plot_type="scatter",
-           gradient_map = lambda x: x,
-           assemble_legend = False,
-           third_var_name_map=None,
-           gradient_list = None,
-           marktype="f",
-           annotations=None,
-           ann_y_offset=0,
-           ann_x_offset=0,
-           **kwargs):
+def plotdf_(axis, df,
+            x="x", y="y",
+            y_sig=None, split=None,
+            third_var=None,
+            gradient=False,
+            sort_x=False,
+            name=None,
+            name_map=None,
+            gradient_code=0,
+            name_list=None,
+            plot_type="scatter",
+            gradient_map = lambda x: x,
+            assemble_legend = False,
+            third_var_name_map=None,
+            gradient_list = None,
+            marktype="f",
+            annotations=None,
+            ann_y_offset=0,
+            ann_x_offset=0,
+            **kwargs):
 
     markcode_max=None
     double_split = False
@@ -673,11 +672,17 @@ def plotdf(axis, df,
             if name_map is None:
                 name_map = lambda x: f"{split} = {x}"
 
-            scatterset(axis, [[]] * len(second_var_list), [[]] * len(second_var_list),
-                       gradient=gradient, gradient_vals = second_var_list,
-                       gradient_code=gradient_code,
-                       marktype="c",
-                       name_list=[name_map(s) for s in second_var_list])
+            if gradient:
+                scatterset(axis, [[]] * len(second_var_list), [[]] * len(second_var_list),
+                           gradient=gradient, gradient_vals = second_var_list,
+                           gradient_code=gradient_code,
+                           marktype="c",
+                           name_list=[name_map(s) for s in second_var_list])
+            else:
+                scatterset(axis, [[]] * len(second_var_list), [[]] * len(second_var_list),
+                           marktype = "c",
+                           name_list =[name_map(s) for s in second_var_list])
+
 
         nice_legend(axis)
         axis.set_xlabel(x)
@@ -711,6 +716,198 @@ def plotdf(axis, df,
                     name_list=name_list,
                     **kwargs)
 
+def plotdf(axis, dataframe,
+           x = "x",
+           y = "y",
+           y_sig = None,
+           split = None,
+           name_list = None,
+           name_map = lambda x: x,
+           plot_type = "scatter",
+           marktype = "f",
+           markcode_max = None,
+           gradient = False,
+           gradient_vals = None,
+           gradient_map = lambda x: x,
+           color = None,
+           color_name_list = None,
+           color_name_map = lambda x: x,
+           shape = None,
+           shape_name_list = None,
+           shape_name_map = lambda x: x,
+           annotations=None,
+           ann_y_offset=0,
+           ann_x_offset=0,
+           **kwargs):
+
+    ## If Y is provided as list
+    if type(y) == list:
+
+        # Generate name_list and gradient_vals
+        name_list = name_list or y
+        name_list = [name_map(n) for n in name_list]
+        gradient_vals = gradient_vals or range(len(y)) if gradient else None
+
+        y_vect_set = [dataframe.loc[y_item] for y_item in y]
+
+        if type(x) == list:
+            x_vect_set = [dataframe.loc[x_item] for x_item in x]
+        else:
+            x_vect_set = [dataframe.loc[x]]
+
+        if y_sig is None:
+            y_sig_vect_set = None
+        else:
+            y_sig_vect_set = [dataframe.loc[y_sig_item] for y_sig_item in y_sig]
+
+        if "scatter" in plot_type:
+            scatterset(axis,
+                       x_vect_set,
+                       y_vect_set,
+                       y_sig_vect_set=y_sig_vect_set,
+                       name_list=name_list,
+                       marktype=marktype,
+                       markcode_max=markcode_max,
+                       gradient=gradient,
+                       gradient_vals = gradient_vals,
+                       annotations=None,
+                       ann_y_offset=0,
+                       ann_x_offset=0,
+                       **kwargs)
+            y_sig_vect_set = None
+
+        if "line" in plot_type:
+            plotlineset(axis,
+                        x_vect_set,
+                        y_vect_set,
+                        y_sig_vect_set = y_sig_vect_set,
+                        name_list=name_list,
+                        gradient=gradient,
+                        gradient_vals=gradient_vals,
+                        **kwargs)
+
+        return
+
+    # Now split by column values (long-form)
+    if split is not None or color is not None or shape is not None:
+        if split is not None:
+            color = split
+            shape = split
+
+        color_vals = list(dict.fromkeys(dataframe[color], None).keys())
+        shape_vals = list(dict.fromkeys(dataframe[shape], None).keys())
+
+        split_values = [(c, s) for c in color_vals for s in shape_vals]
+
+        if gradient:
+            gradient_vals = [gradient_map(c) for c in color_values]
+            gradient_vals = [g - min(gradient_vals) / (max(gradient_vals) - min(gradient_vals))
+                             for g in gradient_vals]
+
+        for i, cs in enumerate(split_values):
+
+            if split is not None:
+                label = name_list[i]
+            else:
+                label = None
+
+            color_correct = dataframe[color] == cs[0]
+            shape_correct = dataframe[shape] == cs[1]
+
+            both_correct = color_correct & shape_correct
+
+            x_vals = dataframe.loc[both_correct][x]
+            y_vals = dataframe.loc[both_correct][y]
+
+            color_index = color_vals.index(cs[0])
+            shape_index = shape_vals.index(cs[1])
+
+            if y_sig is None:
+                y_sig_vals = None
+            else:
+                y_sig_vals = dataframe[both_correct][y_sig]
+
+            if "scatter" in plot_type:
+                scatter(axis,
+                        x_vals,
+                        y_vals,
+                        y_sig_vect=y_sig_vals,
+                        marktype=marktype,
+                        markcode=shape_index,
+                        colorcode=color_index,
+                        label=label)
+                y_sig_vals = None
+
+            if "line" in plot_type:
+                plotline(axis,
+                         x_vals,
+                         y_vals,
+                         y_sig_vect=y_sig_vals,
+                         linecode=shape_index,
+                         colorcode=color_index,
+                         label=label)
+        if split is None:
+            color_name_list = color_name_list or [color_name_map(c) for c in color_vals]
+            shape_name_list = shape_name_list or [shape_name_map(s) for s in shape_vals]
+
+            for color_index, c in enumerate(color_vals):
+                if "scatter" in plot_type:
+                    scatter(axis,
+                            [], [],
+                            marktype="c",
+                            colorcode=color_index,
+                            label=color_name_list[color_index])
+                elif "line" in plot_type:
+                    plotline(axis,
+                             [], [],
+                             linecode=0,
+                             colorcode=color_index,
+                             label=color_name_list[color_index])
+            for shape_index, s in enumerate(shape_vals):
+                if "scatter" in plot_type:
+                    scatter(axis,
+                            [], [],
+                            marktype=marktype,
+                            markcode=shape_index,
+                            color_override="#666666",
+                            label=shape_name_list[shape_index])
+                elif "line" in plot_type:
+                    plotline(axis,
+                             [], [],
+                             linecode=shape_index,
+                             color_override="#666666",
+                             label=shape_name_list[shape_index])
+
+        return
+
+
+
+
+    ## Simplest case
+    if y_sig is None:
+        y_sig_vect = None
+    else:
+        y_sig_vect = dataframe.loc[x]
+
+    if "scatter" in plot_type:
+        scatter(axis,
+                dataframe.loc[x],
+                dataframe.loc[y],
+                y_sig_vect = y_sig_vect)
+
+        # don't add sigma to lin
+        y_sig_vect = None
+
+    if "line" in plot_type:
+        plotline(axis,
+                 dataframe.loc[x],
+                 dataframe.loc[y],
+                 y_sig_vect = y_sig_vect)
+
+
+
+
+
 # Function which plots a heatmap
 def heatmap(axis, matrix, colormap="viridis",
             gradient_code = 0,
@@ -726,12 +923,20 @@ def heatmap(axis, matrix, colormap="viridis",
     if legend == True:
 
         heatmap_norm = mcolors.Normalize(vmin=val_min, vmax=val_max)
-        scalar_mappable = cm.ScalarMappable(norm=heatmap_norm,
-                                            cmap = colormap)
+        try:
+            scalar_mappable = cm.ScalarMappable(norm=heatmap_norm,
+                                                cmap = colormap)
+        except ValueError:
+            scalar_mappable = cm.ScalarMappable(norm=heatmap_norm,
+                                                cmap = colormap_dict[colormap])
+
 
         axis.figure.colorbar(scalar_mappable, ax=axis)
 
-    axis.imshow(matrix, cmap=colormap, vmin=val_min, vmax = val_max)
+    try:
+        axis.imshow(matrix, cmap=colormap, vmin=val_min, vmax = val_max)
+    except ValueError:
+        axis.imshow(matrix, cmap=colormap_dict[colormap], vmin=val_min, vmax=val_max)
 
 # Complex heatmap coz i'm smart and cool
 # Doesnt work for the colorblind sadly
