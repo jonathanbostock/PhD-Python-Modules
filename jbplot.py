@@ -887,12 +887,12 @@ def plotdf(axis, dataframe,
     if y_sig is None:
         y_sig_vect = None
     else:
-        y_sig_vect = dataframe.loc[x]
+        y_sig_vect = dataframe[y_sig]
 
     if "scatter" in plot_type:
         scatter(axis,
-                dataframe.loc[x],
-                dataframe.loc[y],
+                dataframe[x],
+                dataframe[y],
                 y_sig_vect = y_sig_vect)
 
         # don't add sigma to lin
@@ -900,8 +900,8 @@ def plotdf(axis, dataframe,
 
     if "line" in plot_type:
         plotline(axis,
-                 dataframe.loc[x],
-                 dataframe.loc[y],
+                 dataframe[x],
+                 dataframe[y],
                  y_sig_vect = y_sig_vect)
 
 
