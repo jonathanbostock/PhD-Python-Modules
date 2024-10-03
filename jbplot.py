@@ -20,7 +20,7 @@ okabe_ito = ["#56B4E9", #Light Blue
              "#CC79A7", #Pink
              "#0072B2", #Dark Blue
              "#e69f00", #Orange
-             "black","white"]
+             "white","black"]
 
 imperial = ["#0000CC", #Blue
             "#FE0000", #Red
@@ -29,7 +29,7 @@ imperial = ["#0000CC", #Blue
             "#ee82ef", #Pink
             "#ff8b00", #Orange
             "#7cee68", #Purple
-            "black", "white"]
+            "white", "black"]
 
 # Always do it
 two_pi = 2*np.pi
@@ -42,13 +42,36 @@ lines = ["solid","dotted", "dashed", "dashdot",
 markf = ["s", "D", ">", "<", "^", "v","d","*","none"]
 markl = ["+", "x", "2", "1", "4", "3","|","_","none"]
 markc = ["o"] * 8
+
+class TextMarker():
+    @staticmethod
+    def __getitem__(x):
+        text =  "$" f"{str(x).strip()}" "$"
+
+        for a, b in [("\\", r"﹨"),
+                     ("#", r"\#"),
+                     ("%", r"\%")]:
+            text = text.replace(a, b)
+
+        return text
+
 marks = {"f":   markf,
-         "l":    markl,
-         "c":   markc}
-#Table of marker sizes to make them look the same size
-marksizes = {"s":50, "D":40, "^":50, "v": 50, ">":50, "<":50, "d":50, "*":50,
-             "+":80, "x":50, "2":80, "1": 80, "4":80, "3":80, "|":80, "_":80,
-             "o":50, "none": 0}
+         "l":   markl,
+         "c":   markc,
+         "t":   TextMarker()}
+
+class MarkSizes():
+    @staticmethod
+    def __getitem__(x):
+        try:
+            return {"s":50, "D":40, "^":50, "v": 50, ">":50, "<":50, "d":50, "*":50,
+                    "+":80, "x":50, "2":80, "1": 80, "4":80, "3":80, "|":80, "_":80,
+                    "o":50, "none": 0}[x]
+        except KeyError:
+            return 15 * (len(x) -2)
+
+marksizes = MarkSizes()
+
 
 # Define our colormaps
     # Bilinear colormap for positive/negative values
@@ -158,8 +181,8 @@ Code calling order is:
 
 It all comes back to plotline in the end.
 
-    "Do you see those times when there was only one function putting anything
-    onto the axes? It was then that I carried the whole module"
+    Do you see those times when there was only one function putting anything
+    onto the axes? It was then that I carried the whole module
         - jbplot.plotline
 """
 
@@ -213,6 +236,15 @@ def scatter(axis, x_vect, y_vect, y_sig_vect=None,
                          s=marksize,
                          zorder=2,
                          **kwargs)
+        case "t":
+            axis.scatter(x_vect, y_vect,
+                         color = color_to_plot,
+                         edgecolors = "#00000000",
+                         marker=mark,
+                         s=marksize,
+                         zorder=2,
+                         **kwargs)
+
 
     #Note! this plotline does NOT take the kwargs. This might be a problem but
     #I don't really care yet since it doesn't come up very often
@@ -296,7 +328,7 @@ def complex_scatter(axis, x_vect, y_vect, marktype = "f",
 
     if line:
         plotline(axis, x_vect, y_abs_vect, colorcode=-2, linecode=0, linewidth=linewidth)
-
+        text = text.replace("#", r"\#")
     if marktype == "f":
         axis.scatter(x_vect, y_abs_vect,
                      color=color_vect,
@@ -321,7 +353,7 @@ def complex_scatter(axis, x_vect, y_vect, marktype = "f",
                                             cmap = wobb_colormap)
         colorbar = axis.figure.colorbar(scalar_mappable, ax=axis,
                                         ticks=[0, np.pi, two_pi])
-        colorbar.ax.set_yticklabels(["0", "$\pi$", "$2\pi$"])
+        colorbar.ax.set_yticklabels(["0", r"$\pi$", r"$2\pi$"])
 
 
 def figax():
@@ -339,8 +371,8 @@ def gradient_handler(gradient, gradient_vals, i, length,
             s = 1- float(i)/(length-1)
 
         else:
-            s = (gradient_vals[i]-min(gradient_vals))
-            s /= (max(gradient_vals)-min(gradient_vals))
+            s = (gradient_vals[i]-np.nanmin(gradient_vals))
+            s /= (np.nanmax(gradient_vals)-np.nanmin(gradient_vals))
 
         if auto_gradient:
             return colormap_dict["auto"](s, gradient_code)
@@ -638,17 +670,17 @@ def plotdf_(axis, df,
         y_vect_set = []
         third_var_list = []
         for s in split_list:
-            df_split = df.loc[df[split]==s[0]]
-            x_vect_set.append(df_split.loc[df_split[third_var]==s[1]][x].tolist())
-            y_vect_set.append(df_split.loc[df_split[third_var]==s[1]][y].tolist())
+            df_split = df[df[split]==s[0]]
+            x_vect_set.append(df_split[df_split[third_var]==s[1]][x].tolist())
+            y_vect_set.append(df_split[df_split[third_var]==s[1]][y].tolist())
             third_var_list.append(s[1])
 
     elif isinstance(split, str):
-        x_vect_set = [df.loc[df[split]==s][x].tolist() for s in split_list]
-        y_vect_set = [df.loc[df[split]==s][y].tolist() for s in split_list]
+        x_vect_set = [df[df[split]==s][x].tolist() for s in split_list]
+        y_vect_set = [df[df[split]==s][y].tolist() for s in split_list]
 
         if y_sig != None:
-            y_sig_vect_set = [df.loc[df[split]==s][y_sig].tolist() for s in split_list]
+            y_sig_vect_set = [df[df[split]==s][y_sig].tolist() for s in split_list]
 
     # Handle the gradient if a map is needed
     if gradient and gradient_list is None:
@@ -724,6 +756,7 @@ def plotdf(axis, dataframe,
            name_list = None,
            name_map = lambda x: x,
            plot_type = "scatter",
+           symbol = None,
            marktype = "f",
            markcode_max = None,
            gradient = False,
@@ -740,6 +773,9 @@ def plotdf(axis, dataframe,
            ann_x_offset=0,
            **kwargs):
 
+    # Need this to avoid mutating our input
+    dataframe = dataframe.copy().loc[~pd.isna(dataframe[x])]
+
     ## If Y is provided as list
     if type(y) == list:
 
@@ -748,12 +784,12 @@ def plotdf(axis, dataframe,
         name_list = [name_map(n) for n in name_list]
         gradient_vals = gradient_vals or range(len(y)) if gradient else None
 
-        y_vect_set = [dataframe.loc[y_item] for y_item in y]
+        y_vect_set = [dataframe[y_item] for y_item in y]
 
         if type(x) == list:
-            x_vect_set = [dataframe.loc[x_item] for x_item in x]
+            x_vect_set = [dataframe[x_item] for x_item in x]
         else:
-            x_vect_set = [dataframe.loc[x]]
+            x_vect_set = [dataframe[x]]
 
         if y_sig is None:
             y_sig_vect_set = None
@@ -787,6 +823,8 @@ def plotdf(axis, dataframe,
                         **kwargs)
 
         return
+    ## We now know y is not a list
+    dataframe = dataframe.loc[~pd.isna(dataframe[y])]
 
     # Now split by column values (long-form)
     if split is not None or color is not None or shape is not None:
@@ -794,15 +832,41 @@ def plotdf(axis, dataframe,
             color = split
             shape = split
 
+        # Handle if just one color or shape is passed
+        # nb these cannot both be None, if we are in this region of code
+        # Then either one of them or split must be not None
+        # If split is not None, then both are assigned to the value of split
+        if color is None:
+            color = "__dummy__"
+            dataframe["__dummy__"] = "__dummy__"
+
+        if shape is None:
+            shape = "__dummy__"
+            dataframe["__dummy__"] = "__dummy__"
+
         color_vals = list(dict.fromkeys(dataframe[color], None).keys())
         shape_vals = list(dict.fromkeys(dataframe[shape], None).keys())
 
         split_values = [(c, s) for c in color_vals for s in shape_vals]
 
         if gradient:
-            gradient_vals = [gradient_map(c) for c in color_values]
-            gradient_vals = [g - min(gradient_vals) / (max(gradient_vals) - min(gradient_vals))
+            # Calculate and normalize gradient vals
+            gradient_vals = [gradient_map(c) for c in color_vals]
+            min_g = np.nanmin(gradient_vals)
+            max_g = np.nanmax(gradient_vals)
+            gradient_vals = [(g - min_g)/(max_g - min_g)
                              for g in gradient_vals]
+
+            # Calculate the color_overrides
+            if "gradient_code" in kwargs.keys():
+                gradient_code = kwargs["gradient_code"]
+            else:
+                gradient_code = 0
+            color_overrides = [colormap_dict["line_grad"][gradient_code](g)
+                               for g in gradient_vals]
+        # Set default none values for color_overrides
+        else:
+            color_overrides = [None for _ in color_vals]
 
         for i, cs in enumerate(split_values):
 
@@ -820,7 +884,12 @@ def plotdf(axis, dataframe,
             y_vals = dataframe.loc[both_correct][y]
 
             color_index = color_vals.index(cs[0])
-            shape_index = shape_vals.index(cs[1])
+
+            if marktype == "t":
+                # Text marktype, do not edit it
+                shape_index = cs[1]
+            else:
+                shape_index = shape_vals.index(cs[1])
 
             if y_sig is None:
                 y_sig_vals = None
@@ -835,6 +904,7 @@ def plotdf(axis, dataframe,
                         marktype=marktype,
                         markcode=shape_index,
                         colorcode=color_index,
+                        color_override=color_overrides[color_index],
                         label=label)
                 y_sig_vals = None
 
@@ -845,25 +915,29 @@ def plotdf(axis, dataframe,
                          y_sig_vect=y_sig_vals,
                          linecode=shape_index,
                          colorcode=color_index,
+                         color_override=color_overrides[color_index],
                          label=label)
         if split is None:
             color_name_list = color_name_list or [color_name_map(c) for c in color_vals]
             shape_name_list = shape_name_list or [shape_name_map(s) for s in shape_vals]
 
-            for color_index, c in enumerate(color_vals):
+            # Do legends if we want to
+            for color_index, c in enumerate([c for c in color_vals if c != "__dummy__"]):
                 if "scatter" in plot_type:
                     scatter(axis,
                             [], [],
                             marktype="c",
                             colorcode=color_index,
+                            color_override=color_overrides[color_index],
                             label=color_name_list[color_index])
                 elif "line" in plot_type:
                     plotline(axis,
                              [], [],
                              linecode=0,
                              colorcode=color_index,
+                             color_override=color_overrides[color_index],
                              label=color_name_list[color_index])
-            for shape_index, s in enumerate(shape_vals):
+            for shape_index, s in enumerate([s for s in shape_vals if s != "__dummy__"]):
                 if "scatter" in plot_type:
                     scatter(axis,
                             [], [],
@@ -880,19 +954,20 @@ def plotdf(axis, dataframe,
 
         return
 
-
-
-
     ## Simplest case
     if y_sig is None:
         y_sig_vect = None
     else:
-        y_sig_vect = dataframe.loc[x]
+        y_sig_vect = dataframe.loc[y_sig]
+
+    x_vect = dataframe[x]
+    y_vect = dataframe[y]
 
     if "scatter" in plot_type:
         scatter(axis,
-                dataframe.loc[x],
-                dataframe.loc[y],
+                x_vect,
+                y_vect,
+                marktype=marktype,
                 y_sig_vect = y_sig_vect)
 
         # don't add sigma to lin
@@ -900,11 +975,10 @@ def plotdf(axis, dataframe,
 
     if "line" in plot_type:
         plotline(axis,
-                 dataframe.loc[x],
-                 dataframe.loc[y],
+                 x_vect,
+                 y_vect,
+                 marktype=marktype,
                  y_sig_vect = y_sig_vect)
-
-
 
 
 
@@ -914,8 +988,8 @@ def heatmap(axis, matrix, colormap="viridis",
             legend=True,val_range = None):
 
     if val_range == None:
-        val_min = np.min(matrix)
-        val_max = np.max(matrix)
+        val_min = np.nanmin(matrix)
+        val_max = np.nanmax(matrix)
     else:
         val_min = val_range[0]
         val_max = val_range[1]
@@ -966,9 +1040,7 @@ def complex_heatmap(axis, complex_number_array, intensity_transform = lambda x: 
     theta_array = np.divide(np.add(np.angle(complex_number_array), np.pi), two_pi)
     magnitude_array = intensity_transform(np.abs(complex_number_array))
     normalized_magnitude_array = np.divide(magnitude_array, np.max(magnitude_array))
-    """
 
-    """
     color_array = [[np.array(cmy_colormap(theta)[0:3]) * normalized_magnitude
                     for normalized_magnitude, theta in zip(normalized_magnitude_list, theta_list)]
                    for normalized_magnitude_list, theta_list in zip(normalized_magnitude_array, theta_array)]
@@ -990,7 +1062,7 @@ def complex_heatmap(axis, complex_number_array, intensity_transform = lambda x: 
                                             cmap = wobb_colormap)
         colorbar = axis.figure.colorbar(scalar_mappable, ax=axis,
                                         ticks=[0, np.pi, two_pi])
-        colorbar.ax.set_yticklabels(["0", "$\pi$", "$2\pi$"])
+        colorbar.ax.set_yticklabels(["0", r"$\pi$", r"$2\pi$"])
 
 
 # Bar chart time
@@ -1008,8 +1080,8 @@ def barchart(axis, values, name_list=[], sigma_list=[],
                 matplotlib.colors.to_rgb(color))
 
             new_brightness = old_color_hsv[2] + brightness_adjust
-            new_brightness = max(new_brightness, 0)
-            new_brightness = min(new_brightness, 1)
+            new_brightness = np.nanmax(new_brightness, 0)
+            new_brightness = np.nanmin(new_brightness, 1)
 
             new_color_hsv = [old_color_hsv[0],
                              old_color_hsv[1],
