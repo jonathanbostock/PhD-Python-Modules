@@ -3,6 +3,7 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import types
 
 ### Huge thing, wraps everthing in a big fluffy interpretability blanket
 def wrapper(model: nn.Module) -> nn.Module:
@@ -30,20 +31,19 @@ def wrapper(model: nn.Module) -> nn.Module:
                 output = patcher(
                     name = model.true_name,
                     tensor = output)
-
         model.forward = types.MethodType(new_forward, model)
 
         # Recurse, reusing the patcher and activation dict
         for child_name in dir(model):
             child = getattr(child_name)
             if isinstance(child, nn.Module):
-                wrap(
+                _wrap(
                     child,
                     name=f"{name}.{child_name}",
                     activation_dict=activation_dict,
                     patcher=patcher)
-
         return model
+
     return _wrap(model, "model", activation_dict, patcher)
 
 
