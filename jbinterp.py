@@ -5,7 +5,7 @@ import torch.nn as nn
 import torch.optim as optim
 
 ### Huge thing, wraps everthing in a big fluffy interpretability blanket
-def wrapper(model: nn.Module) -> tuple:
+def wrapper(model: nn.Module) -> nn.Module:
     # Define our outer layer
     activation_dict = ActivationDict
     patcher = Patcher
@@ -13,7 +13,7 @@ def wrapper(model: nn.Module) -> tuple:
         model: nn.Module,
         name: str,
         activation_dict: ActivationDict,
-        patcher: Patcher) -> None:
+        patcher: Patcher) -> nn.Module:
 
         # Give the object a True Name
         model.true_name = name
@@ -43,7 +43,7 @@ def wrapper(model: nn.Module) -> tuple:
                     activation_dict=activation_dict,
                     patcher=patcher)
 
-        return model, activation_dict, patcher
+        return model
     return _wrap(model, "model", activation_dict, patcher)
 
 
