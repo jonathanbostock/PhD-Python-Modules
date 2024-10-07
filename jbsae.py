@@ -1,4 +1,13 @@
 ### Jonathan Bostock
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import torch.optim as optim
+from torch.autograd import Function
+Parameter = torch.nn.Parameter
+
+import numpy  as np
+from icecream import ic
 
 ## This assembles STCs into an interpretable ResNet replacement
 class ChRIS(nn.Module):
@@ -227,10 +236,14 @@ class _ChRISLayer(nn.Module):
 
 ### This is to store a bunch of stuff
 class BaseSAE(nn.Module):
-    def __init__(self, *, n_dimensions, n_features, device="cuda"):
+    def __init__(self, *, n_dimensions, n_features, token_bias = False, vocab_size = None, device="cuda"):
         super(BaseSAE, self).__init__()
         self.n_dimensions = n_dimensions
         self.n_features = n_features
+
+        self.token_bias = token_bias
+        self.vocab_size = vocab_size
+
         self.device = device
         self.relu = nn.ReLU()
 
@@ -250,9 +263,15 @@ class BaseSAE(nn.Module):
             torch.zeros(self.n_features, device=self.device))
         self.W_enc = Parameter(W_dec_values.clone().detach().transpose(-2,-1))
 
-        self.b_dec = Parameter(
-            torch.zeros(self.n_dimensions, device=self.device))
         self.W_dec = Parameter(W_dec_values.clone().detach())
+
+        # Put in an embedding matrix for the tokens
+        if self.token_bias:
+            self.b_dec = Parameter(torch.zeros(
+                (self.vocab_size, self.n_dimensions), device=self.device))
+        else:
+            self.b_dec = Parameter(
+                torch.zeros(self.n_dimensions, device=self.device))
 
         # Normalize the damn columns
         self.W_dec.register_hook(self.normalize_columns_hook)
@@ -268,7 +287,7 @@ class BaseSAE(nn.Module):
 
         # Dimensions of matrices
         # W_enc -> [features, dimension]
-        # b_enc -> [features]
+        # b_enc -> [(tokens), features]
         # W_dec -> [dimension, features]
         # W_dec_norms -> [features]
         # b_dec -> [dimension]
@@ -280,9 +299,14 @@ class BaseSAE(nn.Module):
 
     def forward(self, x):
 
-        x_enc = (x - self.b_dec) @ self.W_enc.T + self.b_enc
+        if self.token_bias:
+            dec_bias = self.b_dec[tokens]
+        else:
+            dec_bias = self.b_dec
+
+        x_enc = (x - dec_bias) @ self.W_enc.T + self.b_enc
         activations = self.relu(x_enc)
-        x_dec = activations @ self.W_dec.T + self.b_dec
+        x_dec = activations @ self.W_dec.T + dec_bias
 
         if self.training:
             return x_dec
@@ -331,24 +355,23 @@ class HeavisideSTEFunction(Function):
 # Define a Heaviside function
 class HeavisideSTE(torch.nn.Module):
     def __init__(self, epsilon):
-        super(CustomStep, self).__init__()
+        super(HeavisideSTE, self).__init__()
         self.epsilon = epsilon
 
     def forward(self, x):
-        return CustomStepFunction.apply(x, self.epsilon)
+        return HeavisideSTEFunction.apply(x, self.epsilon)
 
 ## JumpSAE
 class JumpSAE(BaseSAE):
-
-    def __init__(self, *, n_dimensions, n_features, epsilon=1e-3, device="cuda"):
+    def __init__(self, *, n_dimensions, n_features,
+                 epsilon=1e-3, token_bias=False, vocab_size=None, device="cuda"):
         super(JumpSAE, self).__init__(n_dimensions = n_dimensions,
                                       n_features = n_features,
+                                      token_bias = token_bias,
+                                      vocab_size = vocab_size,
                                       device = device)
 
-        self.n_dimensions = n_dimensions
-        self.n_features = n_features
-
-        self.heaviside_ste = HeavisideSTE(epsilon=epsilon)
+        self.heaviside_ste = HeavisideSTE(epsilon=torch.tensor(epsilon, device=device))
         self.reset_parameters()
 
     def reset_parameters(self):
@@ -359,29 +382,61 @@ class JumpSAE(BaseSAE):
         self.theta = Parameter(
             torch.zeros(self.n_features, device=self.device))
 
-        # Not fully necessary but does seem to help
-        self.W_dec.register_hook(self.normalize_columns_hook)
+    def rescale_parameters(self):
+        W_enc = self.W_enc.data
+        b_enc = self.b_enc.data
+        W_dec = self.W_dec.data
+        b_dec = self.b_dec.data
+        theta = self.theta.data
 
-    def forward(self, x):
+        W_dec_norms = torch.linalg.vector_norm(W_dec, dim=0)
 
-        preactivations = (x - self.b_dec) @ self.W_enc.T + self.b_enc
+        # Dimensions of matrices
+        # W_dec_norms -> [features]
+        # W_enc -> [features, dimension]
+        # b_enc -> [(tokens), features]
+        # W_dec -> [dimension, features]
+        # theta -> [features]
+        # b_dec -> [dimension]
+
+        # Scale W_dec so that each column is of size 1
+        # Then scale everyhing before it by the inverse of this
+        self.W_dec.data = (W_dec * (1/W_dec_norms)).detach()
+        self.b_dec.data = b_dec
+        self.W_enc.data = (W_enc.T * W_dec_norms).T
+        self.b_enc.data = b_enc * W_dec_norms
+        self.theta.data = theta * W_dec_norms
+
+    def forward(self, x, tokens=None):
+
+        # dec_bias term handles the "normal" decoder bias and the per_token decoder bias
+        if self.token_bias:
+            dec_bias = self.b_dec[tokens]
+        else:
+            dec_bias = self.b_dec
+
+        preactivations = (x - dec_bias) @ self.W_enc.T + self.b_enc
         gate_values = self.heaviside_ste(preactivations.detach() - self.theta)
         activations = self.relu(preactivations) * gate_values.detach()
-        decoded_values = activations @ self.W_dec.T + self.b_dec
+        decoded_values = activations @ self.W_dec.T + dec_bias
 
         # Return the gate values so we can do our regularization
         return activations, decoded_values, gate_values
 
-    def loss(self, x, y, desired_l0):
+    def loss(self, *, x, y, target_l0, tokens=None):
 
-        _, y_estimate, gate_values = self.forward(x)
+        _, y_estimate, gate_values = self.forward(x, tokens=tokens)
 
         mse_loss = torch.mean((y_estimate - y) **2)
-        l0_mse_loss = (torch.mean(
-            torch.sum(gate_values, dim=-1)) - desired_l0)**2
+        mse_loss_scaled = mse_loss / torch.mean(y**2).detach()
 
-        return mse_loss + 0.1 * l0_mse_loss
+        # Take an l1/l2 interpolated loss on our l0 loss compared to desired l0
+        l0_mse_loss = F.smooth_l1_loss(torch.mean(
+            torch.sum(gate_values, dim=-1)),
+            torch.tensor(target_l0, device=self.device)) / self.n_features
 
+        return mse_loss_scaled + l0_mse_loss
+### End JumpSAE
 
 
 class TopKSAE(BaseSAE):
@@ -410,9 +465,6 @@ class TopKSAE(BaseSAE):
         self.b_dec = Parameter(
             torch.zeros(self.n_dimensions, device=self.device))
         self.W_dec = Parameter(W_dec_values.clone().detach())
-
-        # Not fully necessary but does seem to help
-        self.W_dec.register_hook(self.normalize_columns_hook)
 
     def rescale_parameters(self, scaling_constant):
         # Exists but left blank for compatibility
