@@ -328,7 +328,6 @@ def complex_scatter(axis, x_vect, y_vect, marktype = "f",
 
     if line:
         plotline(axis, x_vect, y_abs_vect, colorcode=-2, linecode=0, linewidth=linewidth)
-        text = text.replace("#", r"\#")
     if marktype == "f":
         axis.scatter(x_vect, y_abs_vect,
                      color=color_vect,
@@ -958,7 +957,6 @@ def plotdf(axis, dataframe,
     if y_sig is None:
         y_sig_vect = None
     else:
-<<<<<<< HEAD
         y_sig_vect = dataframe.loc[y_sig]
 
     x_vect = dataframe[x]
@@ -969,14 +967,6 @@ def plotdf(axis, dataframe,
                 x_vect,
                 y_vect,
                 marktype=marktype,
-=======
-        y_sig_vect = dataframe[y_sig]
-
-    if "scatter" in plot_type:
-        scatter(axis,
-                dataframe[x],
-                dataframe[y],
->>>>>>> 1a9a28e60c6d7aafe25c1122a108de2baa171746
                 y_sig_vect = y_sig_vect)
 
         # don't add sigma to lin
@@ -984,14 +974,9 @@ def plotdf(axis, dataframe,
 
     if "line" in plot_type:
         plotline(axis,
-<<<<<<< HEAD
                  x_vect,
                  y_vect,
                  marktype=marktype,
-=======
-                 dataframe[x],
-                 dataframe[y],
->>>>>>> 1a9a28e60c6d7aafe25c1122a108de2baa171746
                  y_sig_vect = y_sig_vect)
 
 
@@ -1159,6 +1144,7 @@ def save(figure, name, file_types=["svg","png"], dpi=600, keep_box=False):
     for file_type in file_types:
         file_name = name + "." + file_type
 
+        figure.tight_layout()
         figure.savefig(file_name,
                        dpi=dpi,
                        format=file_type,

@@ -364,7 +364,7 @@ class HeavisideSTE(torch.nn.Module):
 ## JumpSAE
 class JumpSAE(BaseSAE):
     def __init__(self, *, n_dimensions, n_features,
-                 epsilon=1e-3, token_bias=False, vocab_size=None, device="cuda"):
+                 epsilon=1e-2, token_bias=False, vocab_size=None, device="cuda"):
         super(JumpSAE, self).__init__(n_dimensions = n_dimensions,
                                       n_features = n_features,
                                       token_bias = token_bias,
@@ -372,6 +372,7 @@ class JumpSAE(BaseSAE):
                                       device = device)
 
         self.heaviside_ste = HeavisideSTE(epsilon=torch.tensor(epsilon, device=device))
+        self.one = torch.tensor(1, device=self.device)
         self.reset_parameters()
 
     def reset_parameters(self):
@@ -416,7 +417,7 @@ class JumpSAE(BaseSAE):
             dec_bias = self.b_dec
 
         preactivations = (x - dec_bias) @ self.W_enc.T + self.b_enc
-        gate_values = self.heaviside_ste(preactivations.detach() - self.theta)
+        gate_values = self.heaviside_ste(preactivations - self.theta)
         activations = self.relu(preactivations) * gate_values.detach()
         decoded_values = activations @ self.W_dec.T + dec_bias
 
@@ -427,15 +428,17 @@ class JumpSAE(BaseSAE):
 
         _, y_estimate, gate_values = self.forward(x, tokens=tokens)
 
+        y_mean = torch.mean(y, dim=0, keepdim=True)
+        y_var = (y-y_mean)**2
+
         mse_loss = torch.mean((y_estimate - y) **2)
-        mse_loss_scaled = mse_loss / torch.mean(y**2).detach()
+        mse_loss_scaled = mse_loss / torch.mean(y_var).detach()
 
         # Take an l1/l2 interpolated loss on our l0 loss compared to desired l0
-        l0_mse_loss = F.smooth_l1_loss(torch.mean(
-            torch.sum(gate_values, dim=-1)),
-            torch.tensor(target_l0, device=self.device)) / self.n_features
+        l0 = torch.mean(torch.sum(gate_values, dim=-1))
+        l0_loss = (l0/target_l0 - 1)**2
 
-        return mse_loss_scaled + l0_mse_loss
+        return mse_loss_scaled, l0_loss
 ### End JumpSAE
 
 
@@ -456,7 +459,7 @@ class TopKSAE(BaseSAE):
         W_dec_values = torch.randn(
             self.n_dimensions, self.n_features, device=self.device)
         W_dec_norms = torch.linalg.vector_norm(W_dec_values, dim=0)
-        W_dec_values = W_dec_values * (0.1/W_dec_norms)
+        W_dec_values = W_dec_values * (1/W_dec_norms)
 
         self.b_enc = Parameter(
             torch.zeros(self.n_features, device=self.device))
