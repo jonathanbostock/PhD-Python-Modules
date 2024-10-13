@@ -236,13 +236,25 @@ class _ChRISLayer(nn.Module):
 
 ### This is to store a bunch of stuff
 class BaseSAE(nn.Module):
-    def __init__(self, *, n_dimensions, n_features, token_bias = False, vocab_size = None, device="cuda"):
+    """
+    Various SAEs inherit from this
+    It can function as an SAE (poorly, relatively)
+    """
+    def __init__(self, *,
+                 n_dimensions: int,
+                 n_features:int,
+                 token_bias: bool = False,
+                 vocab_size: int = None,
+                 tied_embeddings: bool = False,
+                 device: str = "cuda"):
         super(BaseSAE, self).__init__()
+
         self.n_dimensions = n_dimensions
         self.n_features = n_features
 
         self.token_bias = token_bias
         self.vocab_size = vocab_size
+        self.tied_embeddings = tied_embeddings
 
         self.device = device
         self.relu = nn.ReLU()
@@ -257,13 +269,20 @@ class BaseSAE(nn.Module):
         W_dec_values = torch.randn(
             self.n_dimensions, self.n_features, device=self.device)
         W_dec_norms = torch.linalg.vector_norm(W_dec_values, dim=0)
-        W_dec_values = W_dec_values * (0.1/W_dec_norms)
+        W_dec_values = W_dec_values * (1/W_dec_norms)
 
         self.b_enc = Parameter(
             torch.zeros(self.n_features, device=self.device))
-        self.W_enc = Parameter(W_dec_values.clone().detach().transpose(-2,-1))
 
+
+        # Transpose returns a view, so this should work
+        # But we have to do it a weird way
         self.W_dec = Parameter(W_dec_values.clone().detach())
+        if self.tied_embeddings:
+            self.W_enc = W_dec.T
+        else:
+            self.W_enc = Parameter(W_dec_values.clone().detach().T)
+
 
         # Put in an embedding matrix for the tokens
         if self.token_bias:
@@ -333,8 +352,6 @@ class BaseSAE(nn.Module):
 
         return grad
 
-### Implementing the Jump-ReLU SAE from DeepMind (2024)
-# https://arxiv.org/abs/2407.14435
 # This implements the straight-through estimator
 class HeavisideSTEFunction(Function):
     @staticmethod
@@ -363,54 +380,63 @@ class HeavisideSTE(torch.nn.Module):
 
 ## JumpSAE
 class JumpSAE(BaseSAE):
-    def __init__(self, *, n_dimensions, n_features,
-                 epsilon=1e-2, token_bias=False, vocab_size=None, device="cuda"):
-        super(JumpSAE, self).__init__(n_dimensions = n_dimensions,
-                                      n_features = n_features,
-                                      token_bias = token_bias,
-                                      vocab_size = vocab_size,
-                                      device = device)
+
+    """
+    The Jump-ReLU SAE comes from DeepMind (2024)
+    https://arxiv.org/abs/2407.14435
+    This has the best combination of performance and elegance
+    We give options for a per-token decoder bias (improves performance)
+    And tied encoder/decoder weights (reduces feature absorption)
+    """
+
+    def __init__(self, *,
+                 n_dimensions: int,
+                 n_features: int,
+                 epsilon: float = 1e-2,
+                 token_bias: bool = False,
+                 vocab_size: int = None,
+                 tied_embeddings: bool = False,
+                 device: str = "cuda"):
+        super(JumpSAE, self).__init__(
+            n_dimensions = n_dimensions,
+            n_features = n_features,
+            token_bias = token_bias,
+            vocab_size = vocab_size,
+            tied_embeddings = tied_embeddings,
+            device = device)
 
         self.heaviside_ste = HeavisideSTE(epsilon=torch.tensor(epsilon, device=device))
         self.one = torch.tensor(1, device=self.device)
         self.reset_parameters()
 
     def reset_parameters(self):
-
-        # Reset the parameters common to BaseSAE
+        """
+        Resets the parameters found in BaseSAE
+        Then resets theta to also be zero
+        """
         super().reset_parameters()
 
         self.theta = Parameter(
             torch.zeros(self.n_features, device=self.device))
 
-    def rescale_parameters(self):
-        W_enc = self.W_enc.data
-        b_enc = self.b_enc.data
-        W_dec = self.W_dec.data
-        b_dec = self.b_dec.data
-        theta = self.theta.data
+    def rescale_parameters(self) -> None:
+        """
+        We use a backward hook so we don't actually need this
+        This function just passes
+        """
+        pass
 
-        W_dec_norms = torch.linalg.vector_norm(W_dec, dim=0)
-
-        # Dimensions of matrices
-        # W_dec_norms -> [features]
-        # W_enc -> [features, dimension]
-        # b_enc -> [(tokens), features]
-        # W_dec -> [dimension, features]
-        # theta -> [features]
-        # b_dec -> [dimension]
-
-        # Scale W_dec so that each column is of size 1
-        # Then scale everyhing before it by the inverse of this
-        self.W_dec.data = (W_dec * (1/W_dec_norms)).detach()
-        self.b_dec.data = b_dec
-        self.W_enc.data = (W_enc.T * W_dec_norms).T
-        self.b_enc.data = b_enc * W_dec_norms
-        self.theta.data = theta * W_dec_norms
-
-    def forward(self, x, tokens=None):
-
-        # dec_bias term handles the "normal" decoder bias and the per_token decoder bias
+    def forward(self, x: torch.Tensor, tokens: torch.Tensor=None):
+        """
+        Algorithm is:
+            subtract decoder bias (possibly per-token)
+            project up into feature space
+            add encoder bias
+            apply ReLU
+            gate by theta
+            project down to input space
+            add decoder bias again
+        """
         if self.token_bias:
             dec_bias = self.b_dec[tokens]
         else:
@@ -424,8 +450,15 @@ class JumpSAE(BaseSAE):
         # Return the gate values so we can do our regularization
         return activations, decoded_values, gate_values
 
-    def loss(self, *, x, y, target_l0, tokens=None):
-
+    def loss(self, *, x: torch.Tensor, y: torch.Tensor,
+             target_l0: float, tokens: torch.Tensor=None):
+        """
+        Algorithm is:
+            first get our output_estimate (y_estimate)
+            penalize by MSE divided by the variance in y (to normalize)
+            penalize l0 against the target_l0
+            Return both mse and l0 loss
+        """
         _, y_estimate, gate_values = self.forward(x, tokens=tokens)
 
         y_mean = torch.mean(y, dim=0, keepdim=True)
