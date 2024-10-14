@@ -748,17 +748,17 @@ def plotdf(axis, dataframe,
         name_list = [name_map(n) for n in name_list]
         gradient_vals = gradient_vals or range(len(y)) if gradient else None
 
-        y_vect_set = [dataframe.loc[y_item] for y_item in y]
+        y_vect_set = [dataframe[y_item] for y_item in y]
 
         if type(x) == list:
-            x_vect_set = [dataframe.loc[x_item] for x_item in x]
+            x_vect_set = [dataframe[x_item] for x_item in x]
         else:
-            x_vect_set = [dataframe.loc[x]]
+            x_vect_set = [dataframe[x]]
 
         if y_sig is None:
             y_sig_vect_set = None
         else:
-            y_sig_vect_set = [dataframe.loc[y_sig_item] for y_sig_item in y_sig]
+            y_sig_vect_set = [dataframe[y_sig_item] for y_sig_item in y_sig]
 
         if "scatter" in plot_type:
             scatterset(axis,
@@ -800,7 +800,7 @@ def plotdf(axis, dataframe,
         split_values = [(c, s) for c in color_vals for s in shape_vals]
 
         if gradient:
-            gradient_vals = [gradient_map(c) for c in color_values]
+            gradient_vals = [gradient_map(c) for c in color_vals]
             gradient_vals = [g - min(gradient_vals) / (max(gradient_vals) - min(gradient_vals))
                              for g in gradient_vals]
 
