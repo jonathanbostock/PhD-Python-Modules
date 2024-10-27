@@ -278,11 +278,9 @@ class BaseSAE(nn.Module):
         # Transpose returns a view, so this should work
         # But we have to do it a weird way
         self.W_dec = Parameter(W_dec_values.clone().detach())
-        if self.tied_embeddings:
-            self.W_enc = W_dec.T
-        else:
-            self.W_enc = Parameter(W_dec_values.clone().detach().T)
 
+        if not self.tied_embeddings:
+            self.W_enc = Parameter(W_dec_values.clone().detach().T)
 
         # Put in an embedding matrix for the tokens
         if self.token_bias:
@@ -387,8 +385,8 @@ class HeavisideSTE(torch.nn.Module):
 
 ## JumpSAE
 class JumpSAE(BaseSAE):
+    """ Use in almost all cases
 
-    """
     The Jump-ReLU SAE comes from DeepMind (2024)
     https://arxiv.org/abs/2407.14435
     This has the best combination of performance and elegance
@@ -413,29 +411,23 @@ class JumpSAE(BaseSAE):
             device = device)
 
         self.heaviside_ste = HeavisideSTE(epsilon=torch.tensor(epsilon, device=device))
-        self.one = torch.tensor(1, device=self.device)
         self.reset_parameters()
 
     def reset_parameters(self):
-        """
-        Resets the parameters found in BaseSAE
-        Then resets theta to also be zero
-        """
+        """Does the super(), then resets theta and registers hook"""
         super().reset_parameters()
 
         self.theta = Parameter(
             torch.zeros(self.n_features, device=self.device))
 
     def rescale_parameters(self) -> None:
-        """
-        We use a backward hook so we don't actually need this
-        This function just passes
-        """
+        """We use a backward hook so we don't actually need this, pass"""
         pass
 
     def forward(self, x: torch.Tensor, tokens: torch.Tensor=None):
         """
         Algorithm is:
+            set up decoder weights (possibly tied to encoder)
             subtract decoder bias (possibly per-token)
             project up into feature space
             add encoder bias
@@ -449,9 +441,16 @@ class JumpSAE(BaseSAE):
         else:
             dec_bias = self.b_dec
 
-        preactivations = (x - dec_bias) @ self.W_enc.T + self.b_enc
-        gate_values = self.heaviside_ste(preactivations - self.theta).to_sparse()
-        activations = self.relu(preactivations) * gate_values.detach()
+        if self.tied_embeddings:
+            W_enc = self.W_dec.T
+        else:
+            W_enc = self.W_enc
+
+        preactivations = (x - dec_bias) @ W_enc.T + self.b_enc
+        gate_values = self.heaviside_ste(preactivations - self.theta)
+        # Convert to sparse here, since elementwise multiplication is cheap
+        # And the backpropagation still works
+        activations = (self.relu(preactivations) * gate_values.detach()).to_sparse()
         decoded_values = torch.sparse.mm(activations, self.W_dec.T).to_dense() + dec_bias
 
         # Return the gate values so we can do our regularization
@@ -459,7 +458,8 @@ class JumpSAE(BaseSAE):
 
     def loss(self, *, x: torch.Tensor, y: torch.Tensor,
              target_l0: float, tokens: torch.Tensor=None):
-        """
+        """ Get the loss from our function
+
         Algorithm is:
             first get our output_estimate (y_estimate)
             penalize by MSE divided by the variance in y (to normalize)
@@ -474,7 +474,7 @@ class JumpSAE(BaseSAE):
         mse_loss = torch.mean((y_estimate - y) **2)
         mse_loss_scaled = mse_loss / torch.mean(y_var).detach()
 
-        # Take an l1/l2 interpolated loss on our l0 loss compared to desired l0
+        # Take an l2 loss on our l0 values
         l0 = torch.mean(torch.sum(gate_values, dim=-1))
         l0_loss = (l0/target_l0 - 1)**2
 
@@ -716,3 +716,266 @@ class GatedSAE(BaseSAE):
             self.b_gat.data[dead_features] = 0
             self.b_mag.data[dead_features] = 0
             self.r_mag.data[dead_features] = 0
+
+
+### Doing Stuff with Crosscoders
+class SparseCoder(nn.Module):
+    """Generalization of Sparse Autoencoder
+
+    important params:
+        W_enc:  torch.Tensor[input_dim, input_layers, hidden_dim]
+        b_enc:  torch.Tensor[hidden_dim]
+        W_dec:  torch.tensor[output_dim, output_layers, hidden_dim]
+        b_dec:  torch.Tensor[output_dim, output_layers]
+        l1_penalty: float
+    """
+    def __init__(
+        self, *,
+        input_dim:      int,
+        hidden_dim:     int,
+        l1_penalty:     float,
+        output_dim:     int|None = None,
+        input_layers:   int = 1,
+        output_layers:  int|None = None,
+    ):
+        """Init function
+
+        input_dim:      dimension of input(s)
+        hidden_dim:     number of features
+        l1_penalty:     the applied sparsity penalty
+        output_dim:     dimension of output(s) (defaults to None <- input_dim)
+        input_layers:   number of layers from which to take inputs (default 1)
+        output_layers:  number of layers from which to give outputs (defaults to None <- input_layers)
+        """
+        super(SparseCoder, self).__init__()
+
+        assert (per_token_bias == False) or (vocab_size is not None), \
+                "You must provide a vocab size if per_token_bias is True"
+
+        self.input_dim = input_dim
+        self.hidden_dim = hidden_dim
+        self.output_dim = output_dim or input_dim
+        self.input_layers = input_layers
+        self.output_layers = output_layers or input_layers
+
+        # Initialize parameters
+        encoder_weights =  (
+            self.normalize(torch.randn((self.input_dim, 1, self.hidden_dim)))
+            .repeat(1, self.input_layers, 1))
+
+        if self.input_dim == self.output_dim:
+            decoder_weights = encoder_weights.clone()
+        else:
+            decoder_weights = (
+                self.normalize(torch.randn((self.output_dim, 1, self.hidden_dim)))
+                .repeat(1, self.output_layers, 1))
+
+        self.W_enc = nn.Parameter(self.encoder_weights)
+        self.W_dec = nn.Parameter(self.decoder_weights)
+        self.b_enc = nn.Parameter(torch.zeros((self.hidden_dim)))
+        self.b_dec = nn.Parameter(torch.zeros((self.output_layers, self.output_dim)))
+
+        self.register_buffer("l1_penalty", torch.Tensor(l1_penalty))
+
+        self.relu = nn.ReLU()
+
+    def forward(
+        self,
+        src: torch.Tensor
+    ) -> tuple(torch.Tensor):
+        """ Does the forward pass, returns decoded input and activations
+
+        Takes src: torch.Tensor[batch_size, input_layers, input_dim]
+        """
+
+        preactivations = torch.einsum(
+            "bld,dlh->bh",
+            src,
+            self.W_enc) + self.b_enc # [b, h]
+        activations = self.relu(preactivations) # [b, h]
+        out = torch.einsum(
+            "bh,dlh->bld",
+            activations,
+            self.W_dec) + self.b_dec # [b, o_l, o_d]
+
+        return out, activations # [b, o_l, o_d], [b, h]
+
+    def loss(
+        self,
+        src: torch.Tensor,
+        tgt: torch.Tensor
+    ) -> tuple(torch.Tensor):
+        """ Calculate the loss, returns mse and
+
+        src:    torch.Tensor[batch_size, input_layers, input_dim]
+        tgt:    torch.Tensor[batch_size, output_layers, output_dim]
+        """
+
+        out, activations = self.forward(x) # [b, o_l, o_d], [b, h]
+
+        tgt_l2s = torch.sum(tgt ** 2, dim = -1)             # [b, o_l]
+        mean_tgt_l2s = torch.mean(tgt_l2s, dim=0) + 1e-3    # [o_l]
+        tgt_l1s = torch.sqrt(tgt_l2s)                       # [b, o_l]
+        mean_tgt_l1s = torch.mean(tgt_l1s, dim=0) + 1e-3    # [o_l]
+
+        mse_normed = torch.mean(torch.einsum(
+            "bld,l->bld",
+            (out - tgt) ** 2,
+            1/mean_tgt_l2s)) # []
+
+        W_dec_l1s = torch.sqrt(torch.sum(self.W_dec**2, dim = 0)) # [o_l, h_d]
+        W_dec_l1s_normed = torch.einsum(
+            "lh,l->h",
+            W_dec_l1s,
+            1/mean_tgt_l1s) # [h_d]
+        reparameterization_invariant_l1_loss = torch.mean(torch.einsum(
+            "bh,h->bh",
+            activations,
+            W_dec_1ls)) * self.l1_penalty # []
+
+        return mse_normed, reparameterization_invariant_l1_loss # [], []
+
+
+    @staticmethod
+    def normalize(x: torch.Tensor):
+        """Normalizes the columns of a tensor"""
+        norm = torch.sqrt(torch.sum(x**2, dim=0, keepdims=True))
+        x_normed = x / norm
+        return x.detach()
+
+
+### Attempting to improve crosscoders
+class JumpCoder(nn.Module):
+    """Generalization of Jump-ReLU Sparse Autoencoder
+
+    important params:
+        W_enc:  torch.Tensor [input_dim, input_layers, hidden_dim]
+        b_enc:  torch.Tensor [hidden_dim]
+        W_dec:  torch.tensor [output_dim, output_layers, hidden_dim]
+        b_dec:  torch.Tensor [output_dim, output_layers]
+        theta:  torch.Tensor [hidden_dim, output_layers]
+        target_l0:  float
+    """
+    def __init__(
+        self, *,
+        input_dim:      int,
+        hidden_dim:     int,
+        target_l0:      int,
+        output_dim:     int|None = None,
+        input_layers:   int = 1,
+        output_layers:  int|None = None,
+        epsilon:        float = 1e-3
+    ):
+        """Init function
+
+        input_dim:      dimension of input(s)
+        hidden_dim:     number of features
+        target_l0:      the l0 value to target
+        output_dim:     dimension of output(s) (defaults to None <- input_dim)
+        input_layers:   number of layers from which to take inputs (default 1)
+        output_layers:  number of layers from which to give outputs (defaults to None <- input_layers)
+        epsilon:        epsilon for the heaviside STE (default 1e-3)
+        """
+        super(JumpCoder, self).__init__()
+
+        assert (per_token_bias == False) or (vocab_size is not None), \
+                "You must provide a vocab size if per_token_bias is True"
+
+        self.input_dim = input_dim
+        self.hidden_dim = hidden_dim
+        self.output_dim = output_dim or input_dim
+        self.input_layers = input_layers
+        self.output_layers = output_layers or input_layers
+
+        # Initialize parameters
+        encoder_weights =  (
+            self.normalize(torch.randn((self.input_dim, 1, self.hidden_dim)))
+            .repeat(1, self.input_layers, 1))
+
+        if self.input_dim == self.output_dim:
+            decoder_weights = encoder_weights.clone()
+        else:
+            decoder_weights = (
+                self.normalize(torch.randn((self.output_dim, 1, self.hidden_dim)))
+                .repeat(1, self.output_layers, 1))
+
+        self.W_enc = nn.Parameter(self.encoder_weights)
+        self.W_dec = nn.Parameter(self.decoder_weights)
+        self.b_enc = nn.Parameter(torch.zeros((self.hidden_dim)))
+        self.b_dec = nn.Parameter(torch.zeros((self.output_layers, self.output_dim)))
+        self.theta = nn.Parameter(torch.zeros((self.output_layers, self.hidden_dim)))
+
+        self.register_buffer("target_l0", torch.tensor(target_l0))
+        self.heaviside_ste = HeavisideSTE(epsilon=torch.tensor(epsilon))
+
+        self.relu = nn.ReLU()
+
+    def forward(
+        self,
+        src: torch.Tensor
+    ) -> tuple(torch.Tensor):
+        """ Does the forward pass, returns decoded input and activations
+
+        Takes src: torch.Tensor[batch_size, input_layers, input_dim]
+        Returs the decoded src, the activations, and the gate values
+        """
+
+        preactivations = torch.einsum(
+            "bld,dlh->bh",
+            src,
+            self.W_enc) + self.b_enc # [b, h]
+
+        preactivations_repeated = (
+            preactivations
+            .unsqueeze(-1)
+            .repeat(1, 1, self.output_layers)
+        ) # [b, o_l, h]
+
+        gate_values = self.heaviside_ste(preactivations - self.theta) # [b, o_l, h]
+        activations = torch.einsum(
+            "bh,blh->blh",
+            self.relu(preactivations),
+            gate_values) # [b, o_l, h]
+        out = torch.einsum(
+            "blh,dlh->bld",
+            activations,
+            self.W_dec) + self.b_dec # [b, o_l, o_d]
+
+        return out, activations, gate_values # [b, o_l, o_d] [b, o_l, h] [b, o_l, h]
+
+    def loss(
+        self,
+        src: torch.Tensor,
+        tgt: torch.Tensor
+    ) -> tuple(torch.Tensor):
+        """ Calculate the loss, returns mse and
+
+        src:    torch.Tensor[batch_size, input_layers, input_dim]
+        tgt:    torch.Tensor[batch_size, output_layers, output_dim]
+        """
+
+        out, _, gate_values = self.forward(x) # [b, o_l, o_d] _ [b, h]
+
+        tgt_l2s = torch.sum(tgt ** 2, dim = -1)             # [b, o_l]
+        mean_tgt_l2s = torch.mean(tgt_l2s, dim=0) + 1e-3    # [o_l]
+
+        mse_normed = torch.mean(torch.einsum(
+            "bld,l->bld",
+            (out - tgt) ** 2,
+            1/mean_tgt_l2s)) # []
+
+        # This penalty penalizes multiple activations less than single activations
+        l0_adjusted = torch.log(torch.sum(gate_values, dim=-1) + 1) # [b, h]
+        mean_l0 = torch.mean(torch.sum(l0_adjusted, dim=-1)) # []
+        l0_loss = (mean_l0 / self.target_l0 - 1)**2 # []
+
+        return mse_normed, l0_loss # [] []
+
+
+    @staticmethod
+    def normalize(x: torch.Tensor):
+        """Normalizes the columns of a tensor"""
+        norm = torch.sqrt(torch.sum(x**2, dim=0, keepdims=True))
+        x_normed = x / norm
+        return x.detach()
+
