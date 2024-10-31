@@ -767,6 +767,7 @@ def plotdf(axis, dataframe,
            shape = None,
            shape_name_list = None,
            shape_name_map = lambda x: x,
+           invisible_split = None,
            annotations=None,
            ann_y_offset=0,
            ann_x_offset=0,
@@ -836,17 +837,22 @@ def plotdf(axis, dataframe,
         # Then either one of them or split must be not None
         # If split is not None, then both are assigned to the value of split
         if color is None:
-            color = "__dummy__"
-            dataframe["__dummy__"] = "__dummy__"
+            color = "_dummy_color"
+            dataframe["_dummy_color"] = "__dummy__"
 
         if shape is None:
-            shape = "__dummy__"
-            dataframe["__dummy__"] = "__dummy__"
+            shape = "_dummy_shape"
+            dataframe["_dummy_shape"] = "__dummy__"
+
+        if invisible_split is None:
+            invisible_split = "_dummy_invisible_split"
+            dataframe["_dummy_invisible_split"] = "__dummy__"
 
         color_vals = list(dict.fromkeys(dataframe[color], None).keys())
         shape_vals = list(dict.fromkeys(dataframe[shape], None).keys())
+        invisible_split_vals = list(dict.fromkeys(dataframe[invisible_split], None).keys())
 
-        split_values = [(c, s) for c in color_vals for s in shape_vals]
+        split_values = [(c, s, x) for c in color_vals for s in shape_vals for x in invisible_split_vals]
 
         if gradient:
             # Calculate and normalize gradient vals
@@ -876,8 +882,9 @@ def plotdf(axis, dataframe,
 
             color_correct = dataframe[color] == cs[0]
             shape_correct = dataframe[shape] == cs[1]
+            invisible_split_correct = dataframe[invisible_split] == cs[2]
 
-            both_correct = color_correct & shape_correct
+            both_correct = color_correct & shape_correct & invisible_split_correct
 
             x_vals = dataframe.loc[both_correct][x]
             y_vals = dataframe.loc[both_correct][y]
