@@ -278,7 +278,7 @@ def plotline(axis, x_vect, y_vect, y_sig_vect=None,
     else:
         linecode_to_plot = linecode_override
 
-    if y_sig_vect != None:
+    if y_sig_vect is not None:
         y_min_vect = [(y - ys) for y, ys in zip(y_vect, y_sig_vect)]
         y_max_vect = [(y + ys) for y, ys in zip(y_vect, y_sig_vect)]
 
@@ -678,7 +678,7 @@ def plotdf_(axis, df,
         x_vect_set = [df[df[split]==s][x].tolist() for s in split_list]
         y_vect_set = [df[df[split]==s][y].tolist() for s in split_list]
 
-        if y_sig != None:
+        if y_sig is not None:
             y_sig_vect_set = [df[df[split]==s][y_sig].tolist() for s in split_list]
 
     # Handle the gradient if a map is needed
@@ -794,7 +794,7 @@ def plotdf(axis, dataframe,
         if y_sig is None:
             y_sig_vect_set = None
         else:
-            y_sig_vect_set = [dataframe.loc[y_sig_item] for y_sig_item in y_sig]
+            y_sig_vect_set = [dataframe[y_sig_item] for y_sig_item in y_sig]
 
         if "scatter" in plot_type:
             scatterset(axis,
@@ -876,7 +876,10 @@ def plotdf(axis, dataframe,
         for i, cs in enumerate(split_values):
 
             if split is not None:
-                label = name_list[i]
+                if name_list is not None:
+                    label = name_list[i]
+                else:
+                    label = name_map(split_values[i])
             else:
                 label = None
 
@@ -885,6 +888,9 @@ def plotdf(axis, dataframe,
             invisible_split_correct = dataframe[invisible_split] == cs[2]
 
             both_correct = color_correct & shape_correct & invisible_split_correct
+
+            if not True in both_correct.values:
+                continue
 
             x_vals = dataframe.loc[both_correct][x]
             y_vals = dataframe.loc[both_correct][y]
@@ -923,6 +929,7 @@ def plotdf(axis, dataframe,
                          colorcode=color_index,
                          color_override=color_overrides[color_index],
                          label=label)
+
         if split is None:
             color_name_list = color_name_list or [color_name_map(c) for c in color_vals]
             shape_name_list = shape_name_list or [shape_name_map(s) for s in shape_vals]
@@ -964,7 +971,7 @@ def plotdf(axis, dataframe,
     if y_sig is None:
         y_sig_vect = None
     else:
-        y_sig_vect = dataframe.loc[y_sig]
+        y_sig_vect = dataframe[y_sig]
 
     x_vect = dataframe[x]
     y_vect = dataframe[y]
@@ -983,7 +990,6 @@ def plotdf(axis, dataframe,
         plotline(axis,
                  x_vect,
                  y_vect,
-                 marktype=marktype,
                  y_sig_vect = y_sig_vect)
 
 
